@@ -19,7 +19,8 @@ export const SetupView: React.FC = () => {
         if (!tempClient) throw new Error("Invalid URL/Key format");
 
         // Try to fetch count (even if 0, if it doesn't throw, we are connected)
-        const { count, error } = await tempClient.from('students').select('*', { count: 'exact', head: true });
+        // 'count' is unused, removing it
+        const { error } = await tempClient.from('students').select('*', { count: 'exact', head: true });
         
         if (error) throw error;
         

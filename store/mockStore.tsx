@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { getSupabase, getStoredCredentials } from '../services/firebase'; 
-import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage, Classroom } from '../types';
+import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage } from '../types';
 import { setSystemMute } from '../services/soundService';
 
 // --- MOCK DATA (Offline Fallback / Seeding) ---

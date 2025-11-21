@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
-import { Classroom } from '../types';
 
 export const AdminView: React.FC = () => {
   const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, setRole, geminiApiKey, updateGeminiApiKey } = useAppStore();

@@ -26,7 +26,8 @@ export const InstructorView: React.FC = () => {
   
   const playAndCacheAudio = async (req: PickupRequest) => {
       try {
-        let audioBase64 = req.audioBase64;
+        // Allow audioBase64 to be null if generation fails, consistent with generateAudioAnnouncement return type
+        let audioBase64: string | null | undefined = req.audioBase64;
 
         // If no audio cached, generate it
         if (!audioBase64) {
