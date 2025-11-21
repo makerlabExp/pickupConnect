@@ -4,7 +4,7 @@ import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 
 export const StudentLogin: React.FC = () => {
-  const { loginStudent } = useAppStore();
+  const { loginStudent, isConfigured } = useAppStore();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
 
@@ -39,6 +39,16 @@ export const StudentLogin: React.FC = () => {
       <div className="absolute inset-0 z-0 opacity-5 pointer-events-none">
         <svg height="100%" width="100%"><defs><pattern height="40" id="a" patternTransform="scale(2) rotate(45)" patternUnits="userSpaceOnUse" width="40"><rect fill="none" height="100%" width="100%" x="0" y="0"/><path d="M10-10v40M30-10v40M-10 10h40M-10 30h40" stroke="#e2e8f0" strokeWidth="0.5"/></pattern></defs><rect fill="url(#a)" height="100%" width="100%"/></svg>
       </div>
+      
+      {/* Config Status Indicator */}
+      {!isConfigured && (
+          <div className="absolute top-4 right-4 z-20 bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full">
+              <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                  Demo Mode
+              </p>
+          </div>
+      )}
 
       <div className="relative z-10 flex flex-col h-full">
         <header className="p-6 flex justify-center">

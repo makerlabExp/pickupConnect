@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { saveCredentials, initSupabase } from '../services/firebase';
 import { useAppStore } from '../store/mockStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export const SetupView: React.FC = () => {
   const [url, setUrl] = useState('');
@@ -11,6 +11,26 @@ export const SetupView: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const { checkConfiguration } = useAppStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Auto-fill from URL if provided
+  useEffect(() => {
+      const config = searchParams.get('config');
+      if (config) {
+          try {
+              const decoded = atob(config);
+              const { url: loadedUrl, key: loadedKey } = JSON.parse(decoded);
+              if (loadedUrl && loadedKey) {
+                  setUrl(loadedUrl);
+                  setKey(loadedKey);
+                  // If we got it from a link, assume it's correct and auto-save if test passes? 
+                  // Better to let user click verify to be safe.
+              }
+          } catch (e) {
+              console.error("Invalid config link");
+          }
+      }
+  }, [searchParams]);
 
   const handleTestConnection = async () => {
     setStatus('testing');

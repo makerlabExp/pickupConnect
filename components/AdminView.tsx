@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 import { useNavigate } from 'react-router-dom';
+import { getStoredCredentials } from '../services/firebase';
 
 export const AdminView: React.FC = () => {
   const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, logout, isConfigured } = useAppStore();
@@ -64,6 +65,25 @@ export const AdminView: React.FC = () => {
       }
   };
 
+  const handleShareConfig = () => {
+      const { url, key } = getStoredCredentials();
+      if (!url || !key) {
+          alert("System is not configured yet. Connect Supabase first.");
+          return;
+      }
+      
+      const configData = JSON.stringify({ url, key });
+      // Simple encoding to make it URL safe-ish
+      const payload = btoa(configData);
+      
+      const origin = window.location.origin;
+      const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
+      const link = `${origin}${pathname}/#/setup?config=${payload}`;
+      
+      copyToClipboard(link);
+      alert("Configuration Link Copied!\n\nSend this link to your mobile device or other browsers to automatically connect them to the database.");
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-text-light font-display p-6">
       <header className="flex justify-between items-center mb-8 pb-6 border-b border-white/10">
@@ -77,7 +97,7 @@ export const AdminView: React.FC = () => {
         <div className="flex items-center gap-3">
              <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 ${isConfigured ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
                  <span className={`h-2 w-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-orange-500'}`}></span>
-                 {isConfigured ? 'DB Connected' : 'Setup Required'}
+                 {isConfigured ? 'DB Connected' : 'Demo Mode (Offline)'}
              </div>
              <button onClick={() => { logout(); playSound.click(); }} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors">
                  Logout
@@ -123,7 +143,7 @@ export const AdminView: React.FC = () => {
                   <span className="material-symbols-outlined text-orange-400">warning</span>
                   <div>
                       <h3 className="font-bold text-orange-400">System not configured</h3>
-                      <p className="text-xs text-orange-400/70">Please connect the database in Settings to start using the app properly.</p>
+                      <p className="text-xs text-orange-400/70">You are using Mock Data. Connect Supabase in Settings.</p>
                   </div>
               </div>
               <button onClick={() => setActiveTab('settings')} className="px-4 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600">Go to Settings</button>
@@ -308,6 +328,25 @@ export const AdminView: React.FC = () => {
                                 </button>
                              )}
                         </div>
+                        
+                        {/* NEW: Share Config Button */}
+                        {isConfigured && (
+                            <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl">
+                                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">phonelink_setup</span> 2. Connect Devices
+                                </h3>
+                                <p className="text-xs text-slate-400 mb-3">
+                                    Mobile devices don't share this setup automatically. Generate a setup link to sync them.
+                                </p>
+                                <button 
+                                    onClick={handleShareConfig}
+                                    className="w-full py-2 rounded-lg font-bold text-xs border border-white/20 hover:bg-white/5 transition-colors text-white flex items-center justify-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-sm">qr_code_2</span>
+                                    Copy Mobile Setup Link
+                                </button>
+                            </div>
+                        )}
 
                         <div className="h-px bg-white/10 my-2" />
                         
