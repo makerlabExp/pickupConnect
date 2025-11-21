@@ -74,12 +74,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Check for env vars OR local storage
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
-    import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
+    (import.meta as any).env?.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
   );
 
   const [isConfigured, setIsConfigured] = useState(() => {
       // If env vars exist, we are configured
-      return !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) ||
+      const env = (import.meta as any).env || {};
+      return !!(env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) ||
              !!(localStorage.getItem('supabase_url') && localStorage.getItem('supabase_anon_key'));
   });
   
