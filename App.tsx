@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link } from 'react-router-dom';
 import { AppProvider, useAppStore } from './store/mockStore';
 import { ParentView } from './components/ParentView';
 import { StudentLogin } from './components/StudentLogin';
@@ -114,7 +114,7 @@ const InstructorRoute = () => {
 const App: React.FC = () => {
     return (
         <AppProvider>
-            <BrowserRouter>
+            <HashRouter>
                 <Routes>
                     {/* Default route is now Admin (which shows Login or Dashboard) */}
                     <Route path="/" element={<AdminRoute />} />
@@ -129,7 +129,7 @@ const App: React.FC = () => {
                     <Route path="/simulation" element={<SimulationLayout />} />
                     <Route path="/setup" element={<SetupView />} />
                 </Routes>
-            </BrowserRouter>
+            </HashRouter>
         </AppProvider>
     )
 }

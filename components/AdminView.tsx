@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminView: React.FC = () => {
-  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, geminiApiKey, updateGeminiApiKey, logout, isConfigured } = useAppStore();
+  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, logout, isConfigured } = useAppStore();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'students' | 'workshops' | 'settings' | 'links'>('students');
@@ -17,16 +18,13 @@ export const AdminView: React.FC = () => {
   // Session Form
   const [sessionTitle, setSessionTitle] = useState('');
   const [sessionDesc, setSessionDesc] = useState('');
-
-  // Settings Form
-  const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
   
-  // URL Builder for copying - CLEAN URLs for BrowserRouter
-  const getAppUrl = (path: string) => `${window.location.protocol}//${window.location.host}${path}`;
-
-  useEffect(() => {
-      setApiKeyInput(geminiApiKey);
-  }, [geminiApiKey]);
+  // URL Builder for copying - Hash routing for portable deployment
+  const getAppUrl = (path: string) => {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
+    return `${origin}${pathname}/#${path}`;
+  };
 
   // Auto-switch to settings if not configured
   useEffect(() => {
@@ -53,11 +51,6 @@ export const AdminView: React.FC = () => {
           setSessionTitle('');
           setSessionDesc('');
       }
-  };
-
-  const handleSettingsSave = () => {
-      updateGeminiApiKey(apiKeyInput.trim());
-      playSound.success();
   };
 
   const copyToClipboard = async (text: string) => {
@@ -314,31 +307,6 @@ export const AdminView: React.FC = () => {
                                     Connect Supabase
                                 </button>
                              )}
-                        </div>
-
-                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                             <h3 className="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-sm">record_voice_over</span> 2. Voice AI
-                             </h3>
-                             <p className="text-xs text-blue-200/70 mb-3">
-                                 Provide a Gemini API Key for AI announcements.
-                             </p>
-                             
-                            <div>
-                                <input 
-                                    type="password"
-                                    value={apiKeyInput}
-                                    onChange={e => setApiKeyInput(e.target.value)}
-                                    placeholder="AIzaSy..."
-                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs mb-2"
-                                />
-                                <button 
-                                    onClick={handleSettingsSave}
-                                    className="w-full py-2 rounded-lg font-bold text-xs bg-slate-700 text-white hover:bg-slate-600"
-                                >
-                                    Save Key
-                                </button>
-                            </div>
                         </div>
 
                         <div className="h-px bg-white/10 my-2" />

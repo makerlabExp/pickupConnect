@@ -7,12 +7,21 @@ const STORAGE_ANON_KEY = 'supabase_anon_key';
 let supabase: SupabaseClient | null = null;
 
 export const getStoredCredentials = () => {
-  // Safely access env, falling back to empty object if undefined
-  const env = (import.meta as any).env || {};
+  let url = '';
+  let key = '';
+  
+  try {
+    // Access env vars directly so Vite can perform static replacement at build time.
+    url = process.env.VITE_SUPABASE_URL || '';
+    key = process.env.VITE_SUPABASE_ANON_KEY || '';
+  } catch (e) {
+    // ignore error if process.env is undefined (though defined in vite config)
+  }
+
   return {
     // Prioritize Environment Variables if available (for production/deployment), then fallback to LocalStorage
-    url: env.VITE_SUPABASE_URL || localStorage.getItem(STORAGE_URL_KEY) || '',
-    key: env.VITE_SUPABASE_ANON_KEY || localStorage.getItem(STORAGE_ANON_KEY) || ''
+    url: url || localStorage.getItem(STORAGE_URL_KEY) || '',
+    key: key || localStorage.getItem(STORAGE_ANON_KEY) || ''
   };
 };
 

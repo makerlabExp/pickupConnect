@@ -25,7 +25,6 @@ const DEFAULT_SESSION: Session = {
 interface AppState {
   isConfigured: boolean;
   isMuted: boolean;
-  geminiApiKey: string; 
   
   // Auth State
   activeStudentId: string | null;
@@ -40,7 +39,6 @@ interface AppState {
   currentSession: Session;
 
   toggleMute: () => void;
-  updateGeminiApiKey: (key: string) => void;
   
   // Login Actions
   loginStudent: (code: string) => boolean;
@@ -72,15 +70,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => localStorage.getItem('adminAuth') === 'true');
   const [isInstructorLoggedIn, setIsInstructorLoggedIn] = useState<boolean>(() => localStorage.getItem('instructorAuth') === 'true');
 
-  // Check for env vars OR local storage
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
-    (import.meta as any).env?.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
-  );
-
   const [isConfigured, setIsConfigured] = useState(() => {
-      // If env vars exist, we are configured
-      const env = (import.meta as any).env || {};
-      return !!(env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) ||
+      let url = '';
+      let key = '';
+      try {
+        url = process.env.VITE_SUPABASE_URL || '';
+        key = process.env.VITE_SUPABASE_ANON_KEY || '';
+      } catch (e) {
+        // ignore
+      }
+      return !!(url && key) ||
              !!(localStorage.getItem('supabase_url') && localStorage.getItem('supabase_anon_key'));
   });
   
@@ -114,16 +113,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setSystemMute(newState);
           return newState;
       });
-  }, []);
-
-  // --- API KEY UPDATE ---
-  const updateGeminiApiKey = useCallback((key: string) => {
-      setGeminiApiKey(key);
-      if (key) {
-          localStorage.setItem('gemini_api_key', key);
-      } else {
-          localStorage.removeItem('gemini_api_key');
-      }
   }, []);
 
   // --- DATA FETCHING ---
@@ -448,7 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetConfiguration = useCallback(() => {
       localStorage.removeItem('supabase_url');
       localStorage.removeItem('supabase_anon_key');
-      localStorage.removeItem('gemini_api_key'); 
+      // Removed Gemini Key management
       setIsConfigured(false);
   }, []);
 
@@ -456,9 +445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       isConfigured,
       isMuted,
-      geminiApiKey,
       toggleMute,
-      updateGeminiApiKey,
       
       activeStudentId,
       activeParentId,
