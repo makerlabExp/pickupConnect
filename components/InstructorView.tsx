@@ -7,7 +7,7 @@ import { playSound } from '../services/soundService';
 import { PickupRequest } from '../types';
 
 export const InstructorView: React.FC = () => {
-  const { pickupQueue, students, parents, setRole, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute } = useAppStore();
+  const { pickupQueue, students, parents, setRole, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute, geminiApiKey } = useAppStore();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [filterClassroom, setFilterClassroom] = useState<string>('ALL');
   
@@ -30,11 +30,17 @@ export const InstructorView: React.FC = () => {
 
         // If no audio cached, generate it
         if (!audioBase64) {
+            // If API Key is missing, we skip generation
+            if (!geminiApiKey) {
+                markAsAnnounced(req.id);
+                return;
+            }
+
             const student = students.find(s => s.id === req.studentId);
             const parent = parents.find(p => p.id === req.parentId);
             if (!student || !parent) return;
 
-            audioBase64 = await generateAudioAnnouncement(student.name, parent.name, student.classroom);
+            audioBase64 = await generateAudioAnnouncement(geminiApiKey, student.name, parent.name, student.classroom);
             if (audioBase64) {
                 // Save to store/DB immediately
                 setAudioAnnouncement(req.id, audioBase64);
@@ -75,7 +81,7 @@ export const InstructorView: React.FC = () => {
       }
     };
     checkAndAnnounce();
-  }, [activeRequests, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted]);
+  }, [activeRequests, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted, geminiApiKey]);
 
   // Manual trigger
   const handleManualAnnounce = async (req: PickupRequest) => {

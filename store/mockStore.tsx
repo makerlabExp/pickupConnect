@@ -26,6 +26,7 @@ const DEFAULT_SESSION: Session = {
 interface AppState {
   isConfigured: boolean;
   isMuted: boolean;
+  geminiApiKey: string; // New API Key state
   currentUserRole: 'parent' | 'student' | 'instructor' | 'simulation' | 'admin' | null;
   activeStudentId: string | null;
   activeParentId: string | null;
@@ -38,6 +39,7 @@ interface AppState {
 
   setRole: (role: 'parent' | 'student' | 'instructor' | 'simulation' | 'admin' | null) => void;
   toggleMute: () => void;
+  updateGeminiApiKey: (key: string) => void;
   loginStudent: (code: string) => boolean;
   loginParent: (code: string) => boolean;
   logoutParent: () => void;
@@ -64,6 +66,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeParentId, setActiveParentId] = useState<string | null>(() => localStorage.getItem('activeParentId'));
   const [isConfigured, setIsConfigured] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
 
   const [students, setStudents] = useState<Student[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
@@ -92,6 +95,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setSystemMute(newState);
           return newState;
       });
+  }, []);
+
+  // --- API KEY UPDATE ---
+  const updateGeminiApiKey = useCallback((key: string) => {
+      setGeminiApiKey(key);
+      if (key) {
+          localStorage.setItem('gemini_api_key', key);
+      } else {
+          localStorage.removeItem('gemini_api_key');
+      }
   }, []);
 
   // --- DATA FETCHING ---
@@ -365,6 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetConfiguration = useCallback(() => {
       localStorage.removeItem('supabase_url');
       localStorage.removeItem('supabase_anon_key');
+      localStorage.removeItem('gemini_api_key'); // Also clear Gemini key
       setIsConfigured(false);
   }, []);
 
@@ -372,7 +386,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       isConfigured,
       isMuted,
+      geminiApiKey,
       toggleMute,
+      updateGeminiApiKey,
       currentUserRole,
       activeStudentId,
       activeParentId,

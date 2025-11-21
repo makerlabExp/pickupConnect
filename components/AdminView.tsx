@@ -1,13 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 import { Classroom } from '../types';
 
 export const AdminView: React.FC = () => {
-  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, setRole } = useAppStore();
+  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, setRole, geminiApiKey, updateGeminiApiKey } = useAppStore();
   
-  const [activeTab, setActiveTab] = useState<'students' | 'workshops'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'workshops' | 'settings'>('students');
 
   // Student Form
   const [studentName, setStudentName] = useState('');
@@ -17,6 +17,13 @@ export const AdminView: React.FC = () => {
   // Session Form
   const [sessionTitle, setSessionTitle] = useState('');
   const [sessionDesc, setSessionDesc] = useState('');
+
+  // Settings Form
+  const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
+
+  useEffect(() => {
+      setApiKeyInput(geminiApiKey);
+  }, [geminiApiKey]);
 
   const handleStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +43,11 @@ export const AdminView: React.FC = () => {
           setSessionTitle('');
           setSessionDesc('');
       }
+  };
+
+  const handleSettingsSave = () => {
+      updateGeminiApiKey(apiKeyInput.trim());
+      playSound.success();
   };
 
   return (
@@ -89,13 +101,20 @@ export const AdminView: React.FC = () => {
               <span className="material-symbols-outlined">theater_comedy</span>
               Workshop Themes
           </button>
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'settings' ? 'bg-slate-700 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
+          >
+              <span className="material-symbols-outlined">settings</span>
+              Settings
+          </button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
         
         {/* LEFT PANEL (FORMS) */}
         <div className="lg:col-span-1">
-            {activeTab === 'students' ? (
+            {activeTab === 'students' && (
                 <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
                     <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <span className="material-symbols-outlined text-accent">person_add</span>
@@ -146,7 +165,9 @@ export const AdminView: React.FC = () => {
                         </button>
                     </form>
                 </div>
-            ) : (
+            )}
+            
+            {activeTab === 'workshops' && (
                 <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
                     <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <span className="material-symbols-outlined text-indigo-400">add_to_photos</span>
@@ -185,11 +206,54 @@ export const AdminView: React.FC = () => {
                     </form>
                 </div>
             )}
+
+            {activeTab === 'settings' && (
+                 <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-slate-400">settings</span>
+                        System Configuration
+                    </h2>
+                    
+                    <div className="flex flex-col gap-4">
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                            <div className="flex items-start gap-3">
+                                <span className="material-symbols-outlined text-blue-400">record_voice_over</span>
+                                <div>
+                                    <h3 className="text-sm font-bold text-blue-100">Voice Generation (Gemini)</h3>
+                                    <p className="text-xs text-blue-200/70 mt-1 leading-relaxed">
+                                        Provide a Google Gemini API Key to enable AI voice announcements. 
+                                        If left empty, the system will simply play a notification chime.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Gemini API Key (Optional)</label>
+                            <input 
+                                type="password"
+                                value={apiKeyInput}
+                                onChange={e => setApiKeyInput(e.target.value)}
+                                placeholder="AIzaSy..."
+                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-sm"
+                            />
+                        </div>
+                        
+                        <button 
+                            onClick={handleSettingsSave}
+                            className="mt-2 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all bg-slate-700 text-white hover:bg-slate-600"
+                        >
+                            <span className="material-symbols-outlined">save</span>
+                            Save Configuration
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
 
         {/* RIGHT PANEL (LISTS) */}
         <div className="lg:col-span-2">
-            {activeTab === 'students' ? (
+            {activeTab === 'students' && (
                 <>
                     <h2 className="text-lg font-bold text-white mb-4">Registered Families ({students.length})</h2>
                     <div className="grid md:grid-cols-2 gap-4">
@@ -217,7 +281,9 @@ export const AdminView: React.FC = () => {
                         })}
                     </div>
                 </>
-            ) : (
+            )}
+            
+            {activeTab === 'workshops' && (
                 <>
                     <h2 className="text-lg font-bold text-white mb-4">Available Workshop Themes</h2>
                     <div className="space-y-4">
@@ -249,6 +315,13 @@ export const AdminView: React.FC = () => {
                         )}
                     </div>
                 </>
+            )}
+
+            {activeTab === 'settings' && (
+                <div className="flex flex-col items-center justify-center h-64 text-text-muted opacity-50">
+                    <span className="material-symbols-outlined text-6xl mb-4">tune</span>
+                    <p>Select options from the panel on the left</p>
+                </div>
             )}
         </div>
       </div>

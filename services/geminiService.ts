@@ -1,27 +1,22 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// Initialize the Gemini API client
-// Safely access process.env to prevent browser crashes if process is not defined
-const apiKey = (typeof process !== "undefined" && process.env && process.env.API_KEY) 
-  ? process.env.API_KEY 
-  : "";
-
-const ai = new GoogleGenAI({ apiKey });
-
 /**
  * Generates high-quality speech audio directly from Gemini
  */
 export const generateAudioAnnouncement = async (
+  apiKey: string,
   studentName: string,
   parentName: string,
   classroom?: string
 ): Promise<string | null> => {
   try {
     if (!apiKey) {
-      console.warn("Gemini API Key is missing. Audio announcement skipped.");
+      // Silently return null if no key is provided, allowing the app to fallback to just chimes
       return null;
     }
+
+    const ai = new GoogleGenAI({ apiKey });
 
     // Refined prompt to include classroom
     // 'Puck' is often a very clear, slightly deeper voice suitable for announcements
