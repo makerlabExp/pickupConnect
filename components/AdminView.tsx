@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
@@ -22,7 +21,7 @@ export const AdminView: React.FC = () => {
   // Settings Form
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
   
-  // URL Builder for copying
+  // URL Builder for copying - CLEAN URLs for BrowserRouter
   const getAppUrl = (path: string) => `${window.location.protocol}//${window.location.host}${path}`;
 
   useEffect(() => {

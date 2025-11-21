@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { getSupabase, getStoredCredentials } from '../services/firebase'; 
 import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage } from '../types';
@@ -73,9 +72,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => localStorage.getItem('adminAuth') === 'true');
   const [isInstructorLoggedIn, setIsInstructorLoggedIn] = useState<boolean>(() => localStorage.getItem('instructorAuth') === 'true');
 
-  const [isConfigured, setIsConfigured] = useState(false);
+  // Check for env vars OR local storage
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
+    import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || ''
+  );
+
+  const [isConfigured, setIsConfigured] = useState(() => {
+      // If env vars exist, we are configured
+      return !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) ||
+             !!(localStorage.getItem('supabase_url') && localStorage.getItem('supabase_anon_key'));
+  });
+  
   const [isMuted, setIsMuted] = useState(false);
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
 
   // Initialize with Mock data to ensure app works "Offline" / "Demo" by default
   const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS);

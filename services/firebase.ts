@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Keys for localStorage
@@ -9,8 +8,9 @@ let supabase: SupabaseClient | null = null;
 
 export const getStoredCredentials = () => {
   return {
-    url: localStorage.getItem(STORAGE_URL_KEY) || '',
-    key: localStorage.getItem(STORAGE_ANON_KEY) || ''
+    // Prioritize Environment Variables if available (for production/deployment), then fallback to LocalStorage
+    url: import.meta.env.VITE_SUPABASE_URL || localStorage.getItem(STORAGE_URL_KEY) || '',
+    key: import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem(STORAGE_ANON_KEY) || ''
   };
 };
 
