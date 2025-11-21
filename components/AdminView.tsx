@@ -5,7 +5,7 @@ import { playSound } from '../services/soundService';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminView: React.FC = () => {
-  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, geminiApiKey, updateGeminiApiKey, logout, checkConfiguration, isConfigured } = useAppStore();
+  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, geminiApiKey, updateGeminiApiKey, logout, isConfigured } = useAppStore();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'students' | 'workshops' | 'settings' | 'links'>('students');

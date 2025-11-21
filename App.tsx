@@ -11,7 +11,7 @@ import { AdminLogin } from './components/AdminLogin';
 import { InstructorLogin } from './components/InstructorLogin';
 
 const SimulationLayout: React.FC = () => {
-    const { activeStudentId, activeParentId, students, parents } = useAppStore();
+    const { activeStudentId, students } = useAppStore();
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 overflow-hidden font-display">
