@@ -5,11 +5,13 @@ import { generateAudioAnnouncement } from '../services/geminiService';
 import { playGeminiAudio, initAudioContext } from '../services/ttsService';
 import { playSound } from '../services/soundService';
 import { PickupRequest } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 export const InstructorView: React.FC = () => {
-  const { pickupQueue, students, parents, setRole, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute, geminiApiKey } = useAppStore();
+  const { pickupQueue, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute, geminiApiKey } = useAppStore();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [filterClassroom, setFilterClassroom] = useState<string>('ALL');
+  const navigate = useNavigate();
   
   const processingRef = useRef<Set<string>>(new Set());
 
@@ -122,7 +124,7 @@ export const InstructorView: React.FC = () => {
                 <span className="material-symbols-outlined">{isMuted ? 'volume_off' : 'volume_up'}</span>
             </button>
             <button 
-                onClick={() => setRole(null)}
+                onClick={() => navigate('/')}
                 className="px-4 py-2 rounded-lg bg-surface-dark hover:bg-white/10 text-sm font-medium transition-colors"
             >
                 Logout

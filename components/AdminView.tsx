@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
+import { useNavigate } from 'react-router-dom';
 
 export const AdminView: React.FC = () => {
-  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, setRole, geminiApiKey, updateGeminiApiKey } = useAppStore();
+  const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, geminiApiKey, updateGeminiApiKey, logout, checkConfiguration, isConfigured } = useAppStore();
+  const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState<'students' | 'workshops' | 'settings'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'workshops' | 'settings' | 'links'>('students');
 
   // Student Form
   const [studentName, setStudentName] = useState('');
@@ -19,10 +21,20 @@ export const AdminView: React.FC = () => {
 
   // Settings Form
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
+  
+  // URL Builder for copying
+  const getAppUrl = (path: string) => `${window.location.protocol}//${window.location.host}${path}`;
 
   useEffect(() => {
       setApiKeyInput(geminiApiKey);
   }, [geminiApiKey]);
+
+  // Auto-switch to settings if not configured
+  useEffect(() => {
+      if (!isConfigured) {
+          setActiveTab('settings');
+      }
+  }, [isConfigured]);
 
   const handleStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,65 +61,82 @@ export const AdminView: React.FC = () => {
       playSound.success();
   };
 
+  const copyToClipboard = async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        playSound.success();
+        alert("Link copied to clipboard!");
+      } catch (err) {
+        console.error('Failed to copy:', err);
+        alert(`Could not copy automatically. Please copy this URL:\n${text}`);
+      }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-text-light font-display p-6">
       <header className="flex justify-between items-center mb-8 pb-6 border-b border-white/10">
         <div className="flex items-center gap-4">
-           <button onClick={() => setRole(null)} className="hover:text-white text-slate-400 transition-colors">
-             <span className="material-symbols-outlined">arrow_back</span>
-           </button>
            <div>
              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
              <p className="text-text-muted">Academy Management System</p>
            </div>
         </div>
         
-        <div className="flex gap-3">
-            <button 
-                onClick={seedDatabase}
-                className="px-4 py-2 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-sm font-medium transition-colors flex items-center gap-2"
-            >
-                <span className="material-symbols-outlined text-lg">database</span>
-                Seed Data
-            </button>
-            <button 
-                onClick={() => {
-                    if(window.confirm("This will delete EVERYTHING. Continue?")) {
-                        resetSystem();
-                    }
-                }}
-                className="px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm font-medium transition-colors flex items-center gap-2"
-            >
-                <span className="material-symbols-outlined text-lg">delete_forever</span>
-                Reset
-            </button>
+        <div className="flex items-center gap-3">
+             <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 ${isConfigured ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
+                 <span className={`h-2 w-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-orange-500'}`}></span>
+                 {isConfigured ? 'DB Connected' : 'Setup Required'}
+             </div>
+             <button onClick={() => { logout(); playSound.click(); }} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors">
+                 Logout
+             </button>
         </div>
       </header>
 
       {/* Tab Bar */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto">
           <button 
             onClick={() => setActiveTab('students')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'students' ? 'bg-accent text-primary' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
+            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-accent text-primary' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
           >
               <span className="material-symbols-outlined">group_add</span>
-              Student Management
+              Families
           </button>
           <button 
             onClick={() => setActiveTab('workshops')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'workshops' ? 'bg-indigo-500 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
+            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'workshops' ? 'bg-indigo-500 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
           >
               <span className="material-symbols-outlined">theater_comedy</span>
-              Workshop Themes
+              Workshops
+          </button>
+          <button 
+            onClick={() => setActiveTab('links')}
+            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'links' ? 'bg-blue-600 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
+          >
+              <span className="material-symbols-outlined">link</span>
+              Share Links
           </button>
           <button 
             onClick={() => setActiveTab('settings')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'settings' ? 'bg-slate-700 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
+            className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'settings' ? 'bg-slate-700 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
           >
               <span className="material-symbols-outlined">settings</span>
               Settings
           </button>
       </div>
+      
+      {!isConfigured && activeTab !== 'settings' && (
+          <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-orange-400">warning</span>
+                  <div>
+                      <h3 className="font-bold text-orange-400">System not configured</h3>
+                      <p className="text-xs text-orange-400/70">Please connect the database in Settings to start using the app properly.</p>
+                  </div>
+              </div>
+              <button onClick={() => setActiveTab('settings')} className="px-4 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600">Go to Settings</button>
+          </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         
@@ -163,6 +192,16 @@ export const AdminView: React.FC = () => {
                             Generate Accounts
                         </button>
                     </form>
+                    
+                    <div className="mt-6 pt-6 border-t border-white/10">
+                        <button 
+                            onClick={seedDatabase}
+                            className="w-full px-4 py-2 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            <span className="material-symbols-outlined text-lg">database</span>
+                            Seed Test Data
+                        </button>
+                    </div>
                 </div>
             )}
             
@@ -205,6 +244,48 @@ export const AdminView: React.FC = () => {
                     </form>
                 </div>
             )}
+            
+            {activeTab === 'links' && (
+                 <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
+                    <h2 className="text-lg font-bold text-white mb-4">Direct Access Links</h2>
+                    <p className="text-xs text-slate-400 mb-6">Copy and send these links to your users. They will be prompted to log in.</p>
+                    
+                    <div className="space-y-6">
+                        <div className="p-4 bg-slate-900 rounded-xl border border-blue-500/30 relative group hover:border-blue-500 transition-colors">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-blue-400">family_restroom</span>
+                                    <span className="text-sm font-bold text-blue-400 uppercase">Parent App</span>
+                                </div>
+                                <button onClick={() => copyToClipboard(getAppUrl('/parent'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                            </div>
+                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/parent')}</div>
+                        </div>
+
+                        <div className="p-4 bg-slate-900 rounded-xl border border-emerald-500/30 relative group hover:border-emerald-500 transition-colors">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-emerald-400">face</span>
+                                    <span className="text-sm font-bold text-emerald-400 uppercase">Student Kiosk</span>
+                                </div>
+                                <button onClick={() => copyToClipboard(getAppUrl('/student'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                            </div>
+                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/student')}</div>
+                        </div>
+
+                        <div className="p-4 bg-slate-900 rounded-xl border border-purple-500/30 relative group hover:border-purple-500 transition-colors">
+                             <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-purple-400">school</span>
+                                    <span className="text-sm font-bold text-purple-400 uppercase">Instructor View</span>
+                                </div>
+                                <button onClick={() => copyToClipboard(getAppUrl('/instructor'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                            </div>
+                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/instructor')}</div>
+                        </div>
+                    </div>
+                 </div>
+            )}
 
             {activeTab === 'settings' && (
                  <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
@@ -214,36 +295,65 @@ export const AdminView: React.FC = () => {
                     </h2>
                     
                     <div className="flex flex-col gap-4">
+                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                             <h3 className="text-sm font-bold text-indigo-300 mb-2 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">database</span> 1. Database Connection
+                             </h3>
+                             <p className="text-xs text-indigo-200/70 mb-3">
+                                Connect to Supabase to enable real-time sync between parents and instructors.
+                             </p>
+                             {isConfigured ? (
+                                 <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold bg-emerald-500/10 p-2 rounded">
+                                     <span className="material-symbols-outlined text-sm">check_circle</span> Connected
+                                     <button onClick={() => navigate('/setup')} className="ml-auto underline opacity-70 hover:opacity-100">Reconfigure</button>
+                                 </div>
+                             ) : (
+                                <button 
+                                    onClick={() => navigate('/setup')}
+                                    className="w-full py-2 rounded-lg font-bold text-xs bg-indigo-600 text-white hover:bg-indigo-500 transition-colors animate-pulse"
+                                >
+                                    Connect Supabase
+                                </button>
+                             )}
+                        </div>
+
                         <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                            <div className="flex items-start gap-3">
-                                <span className="material-symbols-outlined text-blue-400">record_voice_over</span>
-                                <div>
-                                    <h3 className="text-sm font-bold text-blue-100">Voice Generation (Gemini)</h3>
-                                    <p className="text-xs text-blue-200/70 mt-1 leading-relaxed">
-                                        Provide a Google Gemini API Key to enable AI voice announcements. 
-                                        If left empty, the system will simply play a notification chime.
-                                    </p>
-                                </div>
+                             <h3 className="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">record_voice_over</span> 2. Voice AI
+                             </h3>
+                             <p className="text-xs text-blue-200/70 mb-3">
+                                 Provide a Gemini API Key for AI announcements.
+                             </p>
+                             
+                            <div>
+                                <input 
+                                    type="password"
+                                    value={apiKeyInput}
+                                    onChange={e => setApiKeyInput(e.target.value)}
+                                    placeholder="AIzaSy..."
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs mb-2"
+                                />
+                                <button 
+                                    onClick={handleSettingsSave}
+                                    className="w-full py-2 rounded-lg font-bold text-xs bg-slate-700 text-white hover:bg-slate-600"
+                                >
+                                    Save Key
+                                </button>
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Gemini API Key (Optional)</label>
-                            <input 
-                                type="password"
-                                value={apiKeyInput}
-                                onChange={e => setApiKeyInput(e.target.value)}
-                                placeholder="AIzaSy..."
-                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-sm"
-                            />
-                        </div>
+                        <div className="h-px bg-white/10 my-2" />
                         
                         <button 
-                            onClick={handleSettingsSave}
-                            className="mt-2 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all bg-slate-700 text-white hover:bg-slate-600"
+                            onClick={() => {
+                                if(window.confirm("This will delete EVERYTHING (Local & DB) and refresh. Continue?")) {
+                                    resetSystem();
+                                }
+                            }}
+                            className="py-3 rounded-xl font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 text-xs"
                         >
-                            <span className="material-symbols-outlined">save</span>
-                            Save Configuration
+                            <span className="material-symbols-outlined">delete_forever</span>
+                            Hard Reset System
                         </button>
                     </div>
                 </div>
@@ -278,6 +388,13 @@ export const AdminView: React.FC = () => {
                                 </div>
                             );
                         })}
+                         {students.length === 0 && (
+                             <div className="col-span-full p-12 text-center text-slate-500 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center">
+                                 <span className="material-symbols-outlined text-4xl mb-2 opacity-50">group_off</span>
+                                 <p>No students yet.</p>
+                                 <p className="text-sm mt-1">Use the form on the left to add families.</p>
+                             </div>
+                        )}
                     </div>
                 </>
             )}
@@ -316,10 +433,10 @@ export const AdminView: React.FC = () => {
                 </>
             )}
 
-            {activeTab === 'settings' && (
-                <div className="flex flex-col items-center justify-center h-64 text-text-muted opacity-50">
-                    <span className="material-symbols-outlined text-6xl mb-4">tune</span>
-                    <p>Select options from the panel on the left</p>
+            {(activeTab === 'settings' || activeTab === 'links') && (
+                <div className="flex flex-col items-center justify-center h-64 text-text-muted opacity-30 bg-slate-800/50 rounded-2xl border border-white/5">
+                    <span className="material-symbols-outlined text-6xl mb-4">arrow_back</span>
+                    <p className="font-bold">Configure options in the left panel</p>
                 </div>
             )}
         </div>

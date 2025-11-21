@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { saveCredentials, initSupabase } from '../services/firebase';
 import { useAppStore } from '../store/mockStore';
+import { useNavigate } from 'react-router-dom';
 
 export const SetupView: React.FC = () => {
   const [url, setUrl] = useState('');
@@ -9,6 +10,7 @@ export const SetupView: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const { checkConfiguration } = useAppStore();
+  const navigate = useNavigate();
 
   const handleTestConnection = async () => {
     setStatus('testing');
@@ -19,7 +21,6 @@ export const SetupView: React.FC = () => {
         if (!tempClient) throw new Error("Invalid URL/Key format");
 
         // Try to fetch count (even if 0, if it doesn't throw, we are connected)
-        // 'count' is unused, removing it
         const { error } = await tempClient.from('students').select('*', { count: 'exact', head: true });
         
         if (error) throw error;
@@ -36,6 +37,7 @@ export const SetupView: React.FC = () => {
     if (url && key && status === 'success') {
       saveCredentials(url, key);
       checkConfiguration();
+      navigate('/admin');
     }
   };
 

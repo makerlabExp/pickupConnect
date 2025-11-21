@@ -4,7 +4,7 @@ import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 
 export const StudentView: React.FC = () => {
-  const { pickupQueue, students, activeStudentId, setRole, sendMessage } = useAppStore();
+  const { pickupQueue, students, activeStudentId, sendMessage } = useAppStore();
   const [inputMessage, setInputMessage] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -102,15 +102,11 @@ export const StudentView: React.FC = () => {
       {/* Fixed Header Area: Contains Nav and Status Card. Does NOT scroll. */}
       <div className="shrink-0 z-30 bg-primary border-b border-white/5 shadow-lg relative">
           {/* Top Bar */}
-          <header className="flex items-center p-4 pb-2">
-            <button onClick={() => setRole(null)} className="text-white/50 hover:text-white p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors">
-               <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-            <div className="flex-1 text-center">
+          <header className="flex items-center p-4 pb-2 justify-center">
+            <div className="text-center">
                  <h1 className="text-base font-bold">Hi, {me.name}</h1>
                  <p className="text-[10px] text-text-muted tracking-wider uppercase">Student ID: {me.accessCode}</p>
             </div>
-            <div className="w-10" />
           </header>
 
           {/* Status Notification - Fixed */}

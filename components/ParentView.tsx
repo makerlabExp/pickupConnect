@@ -4,7 +4,7 @@ import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 
 export const ParentView: React.FC = () => {
-  const { currentSession, parents, pickupQueue, updatePickupStatus, sendMessage, activeParentId, loginParent, logoutParent, setRole, currentUserRole } = useAppStore();
+  const { currentSession, parents, pickupQueue, updatePickupStatus, sendMessage, activeParentId, loginParent, logout } = useAppStore();
   
   // --- Login State ---
   const [code, setCode] = useState('');
@@ -71,14 +71,8 @@ export const ParentView: React.FC = () => {
   if (!currentUser) {
       return (
           <div className="flex min-h-screen w-full flex-col bg-primary text-text-light font-display">
-               <div className="flex items-center p-4">
-                {/* Only show back button if we are not in simulation mode (sim has its own layout) */}
-                {currentUserRole !== 'simulation' && (
-                    <button onClick={() => setRole(null)} className="text-white/50 hover:text-white">
-                        <span className="material-symbols-outlined">arrow_back</span>
-                    </button>
-                )}
-                <h1 className="text-lg font-bold flex-1 text-center mr-6">Parent Access</h1>
+               <div className="flex items-center justify-center p-4">
+                <h1 className="text-lg font-bold text-center">Parent Access</h1>
                </div>
 
                <div className="flex-1 flex flex-col items-center justify-center p-8">
@@ -156,7 +150,7 @@ export const ParentView: React.FC = () => {
             </div>
         </div>
         
-        <button onClick={() => { playSound.click(); logoutParent(); }} className="flex size-10 items-center justify-center rounded-full bg-surface-dark text-text-muted hover:text-white transition-colors">
+        <button onClick={() => { playSound.click(); logout(); }} className="flex size-10 items-center justify-center rounded-full bg-surface-dark text-text-muted hover:text-white transition-colors">
           <span className="material-symbols-outlined text-xl">logout</span>
         </button>
       </div>

@@ -26,10 +26,13 @@ const DEFAULT_SESSION: Session = {
 interface AppState {
   isConfigured: boolean;
   isMuted: boolean;
-  geminiApiKey: string; // New API Key state
-  currentUserRole: 'parent' | 'student' | 'instructor' | 'simulation' | 'admin' | null;
+  geminiApiKey: string; 
+  
+  // Auth State
   activeStudentId: string | null;
   activeParentId: string | null;
+  isAdminLoggedIn: boolean;
+  isInstructorLoggedIn: boolean;
   
   students: Student[];
   parents: Parent[];
@@ -37,12 +40,16 @@ interface AppState {
   sessions: Session[];
   currentSession: Session;
 
-  setRole: (role: 'parent' | 'student' | 'instructor' | 'simulation' | 'admin' | null) => void;
   toggleMute: () => void;
   updateGeminiApiKey: (key: string) => void;
+  
+  // Login Actions
   loginStudent: (code: string) => boolean;
   loginParent: (code: string) => boolean;
-  logoutParent: () => void;
+  loginAdmin: (password: string) => boolean;
+  loginInstructor: (password: string) => boolean;
+  logout: () => void;
+
   updatePickupStatus: (studentId: string, status: PickupStatus) => void;
   sendMessage: (studentId: string, text: string, sender: 'student' | 'parent') => void;
   setAnnouncement: (reqId: string, text: string) => void;
@@ -61,17 +68,20 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUserRole, setRole] = useState<AppState['currentUserRole']>(null);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(() => localStorage.getItem('activeStudentId'));
   const [activeParentId, setActiveParentId] = useState<string | null>(() => localStorage.getItem('activeParentId'));
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => localStorage.getItem('adminAuth') === 'true');
+  const [isInstructorLoggedIn, setIsInstructorLoggedIn] = useState<boolean>(() => localStorage.getItem('instructorAuth') === 'true');
+
   const [isConfigured, setIsConfigured] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [parents, setParents] = useState<Parent[]>([]);
+  // Initialize with Mock data to ensure app works "Offline" / "Demo" by default
+  const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS);
+  const [parents, setParents] = useState<Parent[]>(MOCK_PARENTS);
+  const [sessions, setSessions] = useState<Session[]>([DEFAULT_SESSION]);
   const [pickupQueue, setPickupQueue] = useState<PickupRequest[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
 
   // Derived state: Active Session
   const currentSession = sessions.find(s => s.isActive) || DEFAULT_SESSION;
@@ -109,30 +119,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- DATA FETCHING ---
   const refreshData = useCallback(async () => {
-    if (!isConfigured) return;
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) return; // Keep using mock data if no DB
 
     const s = await supabase.from('students').select('*');
-    if (s.data) setStudents(s.data);
+    if (s.data && s.data.length > 0) setStudents(s.data);
 
     const p = await supabase.from('parents').select('*');
-    if (p.data) setParents(p.data);
+    if (p.data && p.data.length > 0) setParents(p.data);
 
     const pk = await supabase.from('pickups').select('*');
     if (pk.data) setPickupQueue(pk.data);
 
     const sess = await supabase.from('sessions').select('*');
     if (sess.data && sess.data.length > 0) setSessions(sess.data);
-    else setSessions([]);
 
-  }, [isConfigured]);
+  }, []);
 
 
   // --- SUPABASE REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
-    if (!isConfigured) return;
-    
     refreshData();
     const supabase = getSupabase();
     if (!supabase) return;
@@ -163,7 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [isConfigured, currentUserRole, refreshData]);
+  }, [refreshData]);
 
   // --- PERSISTENCE ---
   useEffect(() => {
@@ -200,26 +206,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   }, [students, parents]);
 
-  const logoutParent = useCallback(() => {
+  const loginAdmin = useCallback((password: string) => {
+      // Simple hardcoded auth for demo/MVP
+      if (password === 'admin') {
+          setIsAdminLoggedIn(true);
+          localStorage.setItem('adminAuth', 'true');
+          return true;
+      }
+      return false;
+  }, []);
+
+  const loginInstructor = useCallback((password: string) => {
+    if (password === 'teach' || password === 'admin') {
+        setIsInstructorLoggedIn(true);
+        localStorage.setItem('instructorAuth', 'true');
+        return true;
+    }
+    return false;
+  }, []);
+
+  const logout = useCallback(() => {
       setActiveParentId(null);
+      setActiveStudentId(null);
+      setIsAdminLoggedIn(false);
+      setIsInstructorLoggedIn(false);
+      localStorage.removeItem('adminAuth');
+      localStorage.removeItem('instructorAuth');
+      localStorage.removeItem('activeStudentId');
+      localStorage.removeItem('activeParentId');
   }, []);
 
   const updatePickupStatus = useCallback(async (studentId: string, status: PickupStatus) => {
-      const existing = pickupQueue.find(p => p.studentId === studentId);
-      const supabase = getSupabase();
-      if (!supabase) return;
-      
       const timestamp = Date.now();
+      const existing = pickupQueue.find(p => p.studentId === studentId);
+      
+      // Optimistic / Offline Update
       if (existing) {
-          const updates: any = { status, timestamp };
-          if (status === 'arrived' && existing.status !== 'arrived') {
-              updates.hasAnnounced = false;
+          const updatedItem = { ...existing, status, timestamp, hasAnnounced: status === 'arrived' ? false : existing.hasAnnounced };
+          setPickupQueue(prev => prev.map(p => p.id === existing.id ? updatedItem : p));
+          
+          const supabase = getSupabase();
+          if (supabase) {
+              await supabase.from('pickups').update({ 
+                  status, 
+                  timestamp, 
+                  hasAnnounced: status === 'arrived' ? false : existing.hasAnnounced 
+              }).eq('id', existing.id);
           }
-          await supabase.from('pickups').update(updates).eq('id', existing.id);
       } else {
           const student = students.find(s => s.id === studentId);
           if (!student) return;
-          const newReq = {
+          const newReq: PickupRequest = {
               id: `req_${Date.now()}`,
               studentId,
               parentId: student.parentId,
@@ -227,15 +264,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               timestamp,
               chatHistory: []
           };
-          await supabase.from('pickups').insert(newReq);
+          setPickupQueue(prev => [...prev, newReq]);
+          
+          const supabase = getSupabase();
+          if (supabase) {
+              await supabase.from('pickups').insert(newReq);
+          }
       }
   }, [pickupQueue, students]);
 
   const sendMessage = useCallback(async (studentId: string, text: string, sender: 'student' | 'parent') => {
       const existing = pickupQueue.find(p => p.studentId === studentId);
-      const supabase = getSupabase();
-      if (!supabase) return;
-
       const newMessage: ChatMessage = {
           id: `m_${Date.now()}`,
           sender,
@@ -243,13 +282,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           timestamp: Date.now()
       };
 
+      // Optimistic Update
       if (existing) {
           const newHistory = [...(existing.chatHistory || []), newMessage];
-          await supabase.from('pickups').update({ chatHistory: newHistory }).eq('id', existing.id);
+          setPickupQueue(prev => prev.map(p => p.id === existing.id ? { ...p, chatHistory: newHistory } : p));
+          
+          const supabase = getSupabase();
+          if (supabase) await supabase.from('pickups').update({ chatHistory: newHistory }).eq('id', existing.id);
       } else {
           const student = students.find(s => s.id === studentId);
           if (!student) return;
-          const newReq = {
+          const newReq: PickupRequest = {
               id: `req_${Date.now()}`,
               studentId,
               parentId: student.parentId,
@@ -257,29 +300,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               timestamp: Date.now(),
               chatHistory: [newMessage]
           };
-          await supabase.from('pickups').insert(newReq);
+          setPickupQueue(prev => [...prev, newReq]);
+
+          const supabase = getSupabase();
+          if (supabase) await supabase.from('pickups').insert(newReq);
       }
   }, [pickupQueue, students]);
 
   const setAnnouncement = useCallback(async (reqId: string, text: string) => {
+      // Optimistic
+      setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, aiAnnouncement: text } : p));
+
       const supabase = getSupabase();
       if (supabase) await supabase.from('pickups').update({ aiAnnouncement: text }).eq('id', reqId);
   }, []);
 
   const setAudioAnnouncement = useCallback(async (reqId: string, audioBase64: string) => {
+      // Optimistic
+      setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, audioBase64 } : p));
+      
       const supabase = getSupabase();
       if (supabase) await supabase.from('pickups').update({ audioBase64 }).eq('id', reqId);
   }, []);
 
   const markAsAnnounced = useCallback(async (reqId: string) => {
+      // Optimistic
+      setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, hasAnnounced: true } : p));
+
       const supabase = getSupabase();
       if (supabase) await supabase.from('pickups').update({ hasAnnounced: true }).eq('id', reqId);
   }, []);
 
   const addStudent = useCallback(async (studentName: string, parentName: string, classroom: string) => {
-        const supabase = getSupabase();
-        if (!supabase) return;
-
         let code = Math.floor(1000 + Math.random() * 9000).toString();
         const sId = `s_${Date.now()}`;
         const pId = `p_${Date.now()}`;
@@ -300,21 +352,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${parentName + code}`
         };
 
-        const { error: e1 } = await supabase.from('students').insert(newStudent);
-        const { error: e2 } = await supabase.from('parents').insert(newParent);
-        
-        if (e1 || e2) {
-            console.error("Failed to add family", e1, e2);
-            alert("Error adding data. Check console.");
-        } else {
-            alert(`Added ${studentName} to ${classroom}! Access Code: ${code}`);
+        // Optimistic Update
+        setStudents(prev => [...prev, newStudent]);
+        setParents(prev => [...prev, newParent]);
+
+        const supabase = getSupabase();
+        if (supabase) {
+            const { error: e1 } = await supabase.from('students').insert(newStudent);
+            const { error: e2 } = await supabase.from('parents').insert(newParent);
+            if (e1 || e2) {
+                console.error("Failed to sync add family", e1, e2);
+            }
         }
+        alert(`Added ${studentName} to ${classroom}! Access Code: ${code}`);
   }, []);
 
   const addSession = useCallback(async (title: string, description: string, imageUrl: string) => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-      
       const newSession = {
           id: `sess_${Date.now()}`,
           title,
@@ -323,62 +376,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isActive: false,
           endTime: Date.now() + (1000 * 60 * 60 * 2) // 2 hours default
       };
+
+      setSessions(prev => [...prev, newSession]);
       
-      const { error } = await supabase.from('sessions').insert(newSession);
-      if(error) console.error("Add session failed", error);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('sessions').insert(newSession);
+      }
   }, []);
 
   const activateSession = useCallback(async (sessionId: string) => {
-      const supabase = getSupabase();
-      if (!supabase) return;
+      // Optimistic
+      setSessions(prev => prev.map(s => ({ ...s, isActive: s.id === sessionId })));
 
-      // Set all to inactive
-      await supabase.from('sessions').update({ isActive: false }).neq('id', '0');
-      // Set active
-      await supabase.from('sessions').update({ isActive: true }).eq('id', sessionId);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('sessions').update({ isActive: false }).neq('id', '0');
+        await supabase.from('sessions').update({ isActive: true }).eq('id', sessionId);
+      }
   }, []);
 
   const seedDatabase = useCallback(async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-      
-      try {
-        // Add mocks
-        for (const s of MOCK_STUDENTS) {
-            await supabase.from('students').upsert(s);
-        }
-        for (const p of MOCK_PARENTS) {
-            await supabase.from('parents').upsert(p);
-        }
-        // Add default session if none exists
-        const { data } = await supabase.from('sessions').select('*').eq('id', DEFAULT_SESSION.id);
-        if (!data || data.length === 0) {
-            await supabase.from('sessions').insert(DEFAULT_SESSION);
-        }
+      // Local Seed
+      setStudents(MOCK_STUDENTS);
+      setParents(MOCK_PARENTS);
+      setSessions([DEFAULT_SESSION]);
 
-        await refreshData();
-        alert("Database seeded successfully!");
-      } catch (e) {
-          console.error("Seeding failed", e);
-          alert("Seeding failed. Check console.");
+      const supabase = getSupabase();
+      if (supabase) {
+          try {
+            for (const s of MOCK_STUDENTS) await supabase.from('students').upsert(s);
+            for (const p of MOCK_PARENTS) await supabase.from('parents').upsert(p);
+            
+            const { data } = await supabase.from('sessions').select('*').eq('id', DEFAULT_SESSION.id);
+            if (!data || data.length === 0) {
+                await supabase.from('sessions').insert(DEFAULT_SESSION);
+            }
+            await refreshData();
+          } catch (e) {
+              console.error("Seeding failed", e);
+          }
       }
+      alert("Database seeded (Offline & Online where available)!");
   }, [refreshData]);
 
   const resetSystem = useCallback(async () => {
       const supabase = getSupabase();
-      if (!supabase) return;
-      
-      await supabase.from('pickups').delete().neq('id', '0');
-      await supabase.from('parents').delete().neq('id', '0');
-      await supabase.from('students').delete().neq('id', '0');
-      await supabase.from('sessions').delete().neq('id', '0');
+      if (supabase) {
+          await supabase.from('pickups').delete().neq('id', '0');
+          await supabase.from('parents').delete().neq('id', '0');
+          await supabase.from('students').delete().neq('id', '0');
+          await supabase.from('sessions').delete().neq('id', '0');
+      }
+      // Reset local storage and state
+      setStudents([]);
+      setParents([]);
+      setSessions([]);
+      setPickupQueue([]);
       window.location.reload();
   }, []);
 
   const resetConfiguration = useCallback(() => {
       localStorage.removeItem('supabase_url');
       localStorage.removeItem('supabase_anon_key');
-      localStorage.removeItem('gemini_api_key'); // Also clear Gemini key
+      localStorage.removeItem('gemini_api_key'); 
       setIsConfigured(false);
   }, []);
 
@@ -389,18 +450,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       geminiApiKey,
       toggleMute,
       updateGeminiApiKey,
-      currentUserRole,
+      
       activeStudentId,
       activeParentId,
+      isAdminLoggedIn,
+      isInstructorLoggedIn,
+      
       students,
       parents,
       pickupQueue,
       sessions,
       currentSession,
-      setRole,
+      
       loginStudent,
       loginParent,
-      logoutParent,
+      loginAdmin,
+      loginInstructor,
+      logout,
+      
       updatePickupStatus,
       sendMessage,
       setAnnouncement,
