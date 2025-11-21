@@ -1,0 +1,7 @@
+{
+  "name": "MakerLab Connect",
+  "description": "A seamless coordination app for MakerLab Academy workshops, connecting parents, students, and instructors with AI-powered announcements.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
