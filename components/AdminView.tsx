@@ -20,33 +20,6 @@ export const AdminView: React.FC = () => {
   const [sessionTitle, setSessionTitle] = useState('');
   const [sessionDesc, setSessionDesc] = useState('');
   
-  // URL Builder for copying - Hash routing for portable deployment
-  const getAppUrl = (path: string) => {
-    const origin = window.location.origin;
-    const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
-    
-    // If we are configured, append the config hash so the user auto-connects
-    let hash = `#${path}`;
-    
-    if (isConfigured) {
-        const { url, key } = getStoredCredentials();
-        if (url && key) {
-            const configData = JSON.stringify({ url, key });
-            const payload = btoa(configData);
-            // If we are directing to a specific route, we use the Setup route first to config, then redirect
-            // Or we can pass it to setup and redirect to target?
-            // Simplest: Direct to Setup, which then redirects to Root.
-            // But user wants "Copy Student Link".
-            // We can append ?config=... to any route if we handle it in App.tsx, but SetupView handles it best.
-            
-            // Better strategy: Use SetupView as the gateway.
-            return `${origin}${pathname}/#/setup?config=${payload}`;
-        }
-    }
-    
-    return `${origin}${pathname}${hash}`;
-  };
-
   // Auto-switch to settings if not configured
   useEffect(() => {
       if (!isConfigured) {
