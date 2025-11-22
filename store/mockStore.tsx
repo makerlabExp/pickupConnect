@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { getSupabase, getStoredCredentials } from '../services/firebase'; 
 import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage } from '../types';
@@ -86,8 +87,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isMuted, setIsMuted] = useState(false);
 
   // Initialize with Mock data to ensure app works "Offline" / "Demo" by default
-  const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS);
-  const [parents, setParents] = useState<Parent[]>(MOCK_PARENTS);
+  // If configured, we will overwrite this with real data (or empty array) to avoid confusion
+  const [students, setStudents] = useState<Student[]>(isConfigured ? [] : MOCK_STUDENTS);
+  const [parents, setParents] = useState<Parent[]>(isConfigured ? [] : MOCK_PARENTS);
   const [sessions, setSessions] = useState<Session[]>([DEFAULT_SESSION]);
   const [pickupQueue, setPickupQueue] = useState<PickupRequest[]>([]);
 
@@ -118,13 +120,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- DATA FETCHING ---
   const refreshData = useCallback(async () => {
     const supabase = getSupabase();
-    if (!supabase) return; // Keep using mock data if no DB
+    if (!supabase) {
+        // If connection failed or lost, fallback to mock if empty
+        if (students.length === 0 && !isConfigured) setStudents(MOCK_STUDENTS);
+        return;
+    }
+
+    // If we have a supabase client, WE USE IT. 
+    // We overwrite local state completely to ensure "Real Mode" consistency.
 
     const s = await supabase.from('students').select('*');
-    if (s.data && s.data.length > 0) setStudents(s.data);
+    // If data exists, use it. If empty (but connected), use empty array to show "No Students Found" instead of Mock data.
+    if (s.data) setStudents(s.data); 
 
     const p = await supabase.from('parents').select('*');
-    if (p.data && p.data.length > 0) setParents(p.data);
+    if (p.data) setParents(p.data);
 
     const pk = await supabase.from('pickups').select('*');
     if (pk.data) setPickupQueue(pk.data);
@@ -132,7 +142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const sess = await supabase.from('sessions').select('*');
     if (sess.data && sess.data.length > 0) setSessions(sess.data);
 
-  }, []);
+  }, [isConfigured, students.length]);
 
 
   // --- SUPABASE REALTIME SUBSCRIPTIONS ---

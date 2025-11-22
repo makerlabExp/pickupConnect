@@ -24,7 +24,27 @@ export const AdminView: React.FC = () => {
   const getAppUrl = (path: string) => {
     const origin = window.location.origin;
     const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
-    return `${origin}${pathname}/#${path}`;
+    
+    // If we are configured, append the config hash so the user auto-connects
+    let hash = `#${path}`;
+    
+    if (isConfigured) {
+        const { url, key } = getStoredCredentials();
+        if (url && key) {
+            const configData = JSON.stringify({ url, key });
+            const payload = btoa(configData);
+            // If we are directing to a specific route, we use the Setup route first to config, then redirect
+            // Or we can pass it to setup and redirect to target?
+            // Simplest: Direct to Setup, which then redirects to Root.
+            // But user wants "Copy Student Link".
+            // We can append ?config=... to any route if we handle it in App.tsx, but SetupView handles it best.
+            
+            // Better strategy: Use SetupView as the gateway.
+            return `${origin}${pathname}/#/setup?config=${payload}`;
+        }
+    }
+    
+    return `${origin}${pathname}${hash}`;
   };
 
   // Auto-switch to settings if not configured
@@ -73,7 +93,6 @@ export const AdminView: React.FC = () => {
       }
       
       const configData = JSON.stringify({ url, key });
-      // Simple encoding to make it URL safe-ish
       const payload = btoa(configData);
       
       const origin = window.location.origin;
@@ -81,7 +100,7 @@ export const AdminView: React.FC = () => {
       const link = `${origin}${pathname}/#/setup?config=${payload}`;
       
       copyToClipboard(link);
-      alert("Configuration Link Copied!\n\nSend this link to your mobile device or other browsers to automatically connect them to the database.");
+      alert("Magic Link Copied!\n\nOpen this link on any device to automatically connect it to your database.");
   };
 
   return (
@@ -260,40 +279,31 @@ export const AdminView: React.FC = () => {
             {activeTab === 'links' && (
                  <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
                     <h2 className="text-lg font-bold text-white mb-4">Direct Access Links</h2>
-                    <p className="text-xs text-slate-400 mb-6">Copy and send these links to your users. They will be prompted to log in.</p>
+                    <p className="text-xs text-slate-400 mb-6">
+                        These links include your database configuration. Users can just click to connect.
+                    </p>
                     
                     <div className="space-y-6">
                         <div className="p-4 bg-slate-900 rounded-xl border border-blue-500/30 relative group hover:border-blue-500 transition-colors">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-blue-400">family_restroom</span>
-                                    <span className="text-sm font-bold text-blue-400 uppercase">Parent App</span>
+                                    <span className="text-sm font-bold text-blue-400 uppercase">Parent Magic Link</span>
                                 </div>
-                                <button onClick={() => copyToClipboard(getAppUrl('/parent'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                                <button onClick={() => handleShareConfig()} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
                             </div>
-                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/parent')}</div>
+                            <p className="text-xs text-slate-500">Auto-connects and opens app</p>
                         </div>
 
                         <div className="p-4 bg-slate-900 rounded-xl border border-emerald-500/30 relative group hover:border-emerald-500 transition-colors">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-emerald-400">face</span>
-                                    <span className="text-sm font-bold text-emerald-400 uppercase">Student Kiosk</span>
+                                    <span className="text-sm font-bold text-emerald-400 uppercase">Student Magic Link</span>
                                 </div>
-                                <button onClick={() => copyToClipboard(getAppUrl('/student'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                                <button onClick={() => handleShareConfig()} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
                             </div>
-                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/student')}</div>
-                        </div>
-
-                        <div className="p-4 bg-slate-900 rounded-xl border border-purple-500/30 relative group hover:border-purple-500 transition-colors">
-                             <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-purple-400">school</span>
-                                    <span className="text-sm font-bold text-purple-400 uppercase">Instructor View</span>
-                                </div>
-                                <button onClick={() => copyToClipboard(getAppUrl('/instructor'))} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
-                            </div>
-                            <div className="text-xs text-slate-300 font-mono bg-black/30 p-2 rounded select-all">{getAppUrl('/instructor')}</div>
+                            <p className="text-xs text-slate-500">Auto-connects and opens app</p>
                         </div>
                     </div>
                  </div>
@@ -329,21 +339,21 @@ export const AdminView: React.FC = () => {
                              )}
                         </div>
                         
-                        {/* NEW: Share Config Button */}
+                        {/* Share Config Button */}
                         {isConfigured && (
                             <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl">
                                 <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">phonelink_setup</span> 2. Connect Devices
+                                    <span className="material-symbols-outlined text-sm">phonelink_setup</span> 2. Connect Mobile Devices
                                 </h3>
                                 <p className="text-xs text-slate-400 mb-3">
-                                    Mobile devices don't share this setup automatically. Generate a setup link to sync them.
+                                    Use this Magic Link to automatically connect other devices to this database.
                                 </p>
                                 <button 
                                     onClick={handleShareConfig}
                                     className="w-full py-2 rounded-lg font-bold text-xs border border-white/20 hover:bg-white/5 transition-colors text-white flex items-center justify-center gap-2"
                                 >
                                     <span className="material-symbols-outlined text-sm">qr_code_2</span>
-                                    Copy Mobile Setup Link
+                                    Copy Magic Link
                                 </button>
                             </div>
                         )}
@@ -397,7 +407,7 @@ export const AdminView: React.FC = () => {
                          {students.length === 0 && (
                              <div className="col-span-full p-12 text-center text-slate-500 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center">
                                  <span className="material-symbols-outlined text-4xl mb-2 opacity-50">group_off</span>
-                                 <p>No students yet.</p>
+                                 <p>No students found in database.</p>
                                  <p className="text-sm mt-1">Use the form on the left to add families.</p>
                              </div>
                         )}

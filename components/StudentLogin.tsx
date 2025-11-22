@@ -4,9 +4,10 @@ import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 
 export const StudentLogin: React.FC = () => {
-  const { loginStudent, isConfigured } = useAppStore();
+  const { loginStudent, isConfigured, refreshData } = useAppStore();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const handlePress = (digit: string) => {
     playSound.click();
@@ -33,6 +34,13 @@ export const StudentLogin: React.FC = () => {
     setError(false);
   };
 
+  const handleManualSync = async () => {
+      setIsSyncing(true);
+      playSound.click();
+      await refreshData();
+      setTimeout(() => setIsSyncing(false), 800);
+  };
+
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-primary font-display overflow-hidden">
       {/* Background Pattern */}
@@ -41,14 +49,24 @@ export const StudentLogin: React.FC = () => {
       </div>
       
       {/* Config Status Indicator */}
-      {!isConfigured && (
-          <div className="absolute top-4 right-4 z-20 bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full">
-              <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
-                  Demo Mode
-              </p>
-          </div>
-      )}
+      <div className="absolute top-4 right-4 z-20 flex gap-2">
+         {isConfigured ? (
+             <button 
+                onClick={handleManualSync}
+                className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 hover:bg-emerald-500/20 transition-colors"
+             >
+                 <span className={`material-symbols-outlined text-sm ${isSyncing ? 'animate-spin' : ''}`}>refresh</span>
+                 {isSyncing ? 'Syncing...' : 'Connected'}
+             </button>
+         ) : (
+            <div className="bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full">
+                <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                    Demo Mode
+                </p>
+            </div>
+         )}
+      </div>
 
       <div className="relative z-10 flex flex-col h-full">
         <header className="p-6 flex justify-center">

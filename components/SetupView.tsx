@@ -13,21 +13,36 @@ export const SetupView: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Auto-fill from URL if provided
+  // --- AUTO-CONFIG MAGIC LINK LOGIC ---
   useEffect(() => {
       const config = searchParams.get('config');
       if (config) {
           try {
+              setStatus('testing');
               const decoded = atob(config);
               const { url: loadedUrl, key: loadedKey } = JSON.parse(decoded);
+              
               if (loadedUrl && loadedKey) {
                   setUrl(loadedUrl);
                   setKey(loadedKey);
-                  // If we got it from a link, assume it's correct and auto-save if test passes? 
-                  // Better to let user click verify to be safe.
+                  
+                  // Auto-Validate and Save
+                  const tempClient = initSupabase(loadedUrl, loadedKey);
+                  if (tempClient) {
+                      // Save immediately
+                      saveCredentials(loadedUrl, loadedKey);
+                      
+                      // Visual feedback then reload
+                      setTimeout(() => {
+                         // Force a full page reload to ensure clean state with new env vars
+                         window.location.href = window.location.origin + window.location.pathname;
+                      }, 1500);
+                  }
               }
           } catch (e) {
-              console.error("Invalid config link");
+              console.error("Invalid config link", e);
+              setStatus('error');
+              setErrorMsg("Invalid Magic Link");
           }
       }
   }, [searchParams]);
@@ -96,6 +111,27 @@ alter table students disable row level security;
 alter table parents disable row level security;
 alter table pickups disable row level security;
 alter table sessions disable row level security;`;
+
+  // If processing a magic link, show a simpler UI
+  if (searchParams.get('config')) {
+      return (
+          <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 font-display text-text-light">
+              <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500">
+                  <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-400'}`}>
+                      <span className={`material-symbols-outlined text-4xl ${status === 'testing' ? 'animate-spin' : ''}`}>
+                          {status === 'testing' ? 'sync' : status === 'error' ? 'error' : 'check_circle'}
+                      </span>
+                  </div>
+                  <h1 className="text-2xl font-bold mb-2">
+                      {status === 'testing' ? 'Synchronizing App...' : status === 'error' ? 'Setup Failed' : 'Connected!'}
+                  </h1>
+                  <p className="text-text-muted text-center max-w-xs">
+                      {status === 'testing' ? 'Applying security settings from link...' : status === 'error' ? 'The link is invalid or expired.' : 'Redirecting you to the app...'}
+                  </p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 font-display text-text-light">
