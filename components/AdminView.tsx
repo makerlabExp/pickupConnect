@@ -29,7 +29,7 @@ export const AdminView: React.FC = () => {
 
   const handleStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (studentName.trim() && parentName.trim()) {
+    if (studentName.trim() && studentName.trim()) {
       addStudent(studentName, parentName, classroom);
       playSound.success();
       setStudentName('');
@@ -58,7 +58,7 @@ export const AdminView: React.FC = () => {
       }
   };
 
-  const handleShareConfig = () => {
+  const handleShareConfig = (redirectPath?: string) => {
       const { url, key } = getStoredCredentials();
       if (!url || !key) {
           alert("System is not configured yet. Connect Supabase first.");
@@ -69,11 +69,22 @@ export const AdminView: React.FC = () => {
       const payload = btoa(configData);
       
       const origin = window.location.origin;
+      // For HashRouter, we construct the URL carefully:
+      // https://domain.com/#/setup?config=...&redirect=/parent
+      // The hash comes before the path in React Router 7/6 HashRouter, but queries can be tricky.
+      // Standard format: https://domain.com/#/setup?config=...
+      
       const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
-      const link = `${origin}${pathname}/#/setup?config=${payload}`;
+      let link = `${origin}${pathname}/#/setup?config=${payload}`;
+      
+      if (redirectPath) {
+          link += `&redirect=${redirectPath}`;
+      }
       
       copyToClipboard(link);
-      alert("Magic Link Copied!\n\nOpen this link on any device to automatically connect it to your database.");
+      
+      const roleName = redirectPath ? redirectPath.replace('/', '').toUpperCase() : 'Main App';
+      alert(`Magic Link for ${roleName} copied!\n\nShare this with users. It will auto-configure the app and open the correct screen.`);
   };
 
   return (
@@ -118,7 +129,7 @@ export const AdminView: React.FC = () => {
             className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'links' ? 'bg-blue-600 text-white' : 'bg-surface-dark text-text-muted hover:bg-white/5'}`}
           >
               <span className="material-symbols-outlined">link</span>
-              Share Links
+              Kiosk & Links
           </button>
           <button 
             onClick={() => setActiveTab('settings')}
@@ -251,32 +262,54 @@ export const AdminView: React.FC = () => {
             
             {activeTab === 'links' && (
                  <div className="bg-slate-800 rounded-2xl p-6 border border-white/5 shadow-xl sticky top-6">
-                    <h2 className="text-lg font-bold text-white mb-4">Direct Access Links</h2>
+                    <h2 className="text-lg font-bold text-white mb-4">Direct Kiosk Access</h2>
                     <p className="text-xs text-slate-400 mb-6">
-                        These links include your database configuration. Users can just click to connect.
+                        Share these links with parents or students. They bypass the main menu and connect securely.
                     </p>
                     
                     <div className="space-y-6">
+                        {/* Parent Link */}
                         <div className="p-4 bg-slate-900 rounded-xl border border-blue-500/30 relative group hover:border-blue-500 transition-colors">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-blue-400">family_restroom</span>
-                                    <span className="text-sm font-bold text-blue-400 uppercase">Parent Magic Link</span>
+                                    <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-blue-400 text-sm">family_restroom</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-bold text-blue-400 uppercase block">Parent Direct Link</span>
+                                    </div>
                                 </div>
-                                <button onClick={() => handleShareConfig()} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                                <button onClick={() => handleShareConfig('/parent')} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors hover:bg-blue-600"><span className="material-symbols-outlined text-sm">content_copy</span></button>
                             </div>
-                            <p className="text-xs text-slate-500">Auto-connects and opens app</p>
+                            <p className="text-xs text-slate-500">Auto-configures & opens Parent Login immediately.</p>
                         </div>
 
+                        {/* Student Link */}
                         <div className="p-4 bg-slate-900 rounded-xl border border-emerald-500/30 relative group hover:border-emerald-500 transition-colors">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-emerald-400">face</span>
-                                    <span className="text-sm font-bold text-emerald-400 uppercase">Student Magic Link</span>
+                                     <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400 text-sm">face</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-emerald-400 uppercase">Student Kiosk Link</span>
                                 </div>
-                                <button onClick={() => handleShareConfig()} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                                <button onClick={() => handleShareConfig('/student')} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors hover:bg-emerald-600"><span className="material-symbols-outlined text-sm">content_copy</span></button>
                             </div>
-                            <p className="text-xs text-slate-500">Auto-connects and opens app</p>
+                            <p className="text-xs text-slate-500">Auto-configures & opens Student Keypad immediately.</p>
+                        </div>
+
+                        {/* Instructor Link */}
+                        <div className="p-4 bg-slate-900 rounded-xl border border-purple-500/30 relative group hover:border-purple-500 transition-colors">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                     <div className="h-8 w-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-purple-400 text-sm">desktop_windows</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-purple-400 uppercase">Instructor Link</span>
+                                </div>
+                                <button onClick={() => handleShareConfig('/instructor')} className="text-slate-400 hover:text-white bg-white/5 p-2 rounded-lg transition-colors hover:bg-purple-600"><span className="material-symbols-outlined text-sm">content_copy</span></button>
+                            </div>
+                            <p className="text-xs text-slate-500">Auto-configures & opens Instructor Dashboard.</p>
                         </div>
                     </div>
                  </div>
@@ -316,17 +349,17 @@ export const AdminView: React.FC = () => {
                         {isConfigured && (
                             <div className="p-4 bg-slate-900/50 border border-white/10 rounded-xl">
                                 <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">phonelink_setup</span> 2. Connect Mobile Devices
+                                    <span className="material-symbols-outlined text-sm">phonelink_setup</span> 2. Connect Devices
                                 </h3>
                                 <p className="text-xs text-slate-400 mb-3">
-                                    Use this Magic Link to automatically connect other devices to this database.
+                                    Go to "Kiosk & Links" tab to get role-specific setup links.
                                 </p>
                                 <button 
-                                    onClick={handleShareConfig}
+                                    onClick={() => setActiveTab('links')}
                                     className="w-full py-2 rounded-lg font-bold text-xs border border-white/20 hover:bg-white/5 transition-colors text-white flex items-center justify-center gap-2"
                                 >
-                                    <span className="material-symbols-outlined text-sm">qr_code_2</span>
-                                    Copy Magic Link
+                                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                    Get Kiosk Links
                                 </button>
                             </div>
                         )}
@@ -342,7 +375,7 @@ export const AdminView: React.FC = () => {
                             className="py-3 rounded-xl font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 text-xs"
                         >
                             <span className="material-symbols-outlined">delete_forever</span>
-                            Hard Reset System
+                            Clear Data & Reset
                         </button>
                     </div>
                 </div>

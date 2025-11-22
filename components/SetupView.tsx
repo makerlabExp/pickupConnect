@@ -16,6 +16,8 @@ export const SetupView: React.FC = () => {
   // --- AUTO-CONFIG MAGIC LINK LOGIC ---
   useEffect(() => {
       const config = searchParams.get('config');
+      const redirectPath = searchParams.get('redirect'); // e.g., '/parent', '/student'
+
       if (config) {
           try {
               setStatus('testing');
@@ -32,12 +34,13 @@ export const SetupView: React.FC = () => {
                       // Save immediately
                       saveCredentials(loadedUrl, loadedKey);
                       
-                      // Visual feedback then reload to HOME
+                      // FAST REDIRECT:
+                      // We set a short timeout just to let the "Connected" tick appear for a split second
                       setTimeout(() => {
-                         // Redirect to root (HomeView) instead of current setup path
-                         window.location.href = window.location.origin + '/#/';
-                         window.location.reload();
-                      }, 1500);
+                         const target = redirectPath ? `/#${redirectPath}` : '/#/';
+                         window.location.href = window.location.origin + target;
+                         window.location.reload(); // Force reload to ensure store picks up new credentials
+                      }, 800);
                   }
               }
           } catch (e) {
@@ -117,17 +120,17 @@ alter table sessions disable row level security;`;
   if (searchParams.get('config')) {
       return (
           <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 font-display text-text-light">
-              <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500">
+              <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
                   <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-400'}`}>
                       <span className={`material-symbols-outlined text-4xl ${status === 'testing' ? 'animate-spin' : ''}`}>
                           {status === 'testing' ? 'sync' : status === 'error' ? 'error' : 'check_circle'}
                       </span>
                   </div>
                   <h1 className="text-2xl font-bold mb-2">
-                      {status === 'testing' ? 'Synchronizing App...' : status === 'error' ? 'Setup Failed' : 'Connected!'}
+                      {status === 'testing' ? 'Connecting...' : status === 'error' ? 'Setup Failed' : 'Access Granted'}
                   </h1>
-                  <p className="text-text-muted text-center max-w-xs">
-                      {status === 'testing' ? 'Applying security settings from link...' : status === 'error' ? 'The link is invalid or expired.' : 'Redirecting you to the main menu...'}
+                  <p className="text-text-muted text-center max-w-xs text-sm">
+                      {status === 'testing' ? 'Configuring device...' : status === 'error' ? 'The link is invalid.' : 'Redirecting you now...'}
                   </p>
               </div>
           </div>

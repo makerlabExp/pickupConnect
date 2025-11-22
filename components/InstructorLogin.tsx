@@ -28,7 +28,7 @@ export const InstructorLogin: React.FC = () => {
                 <span className="material-symbols-outlined text-3xl text-purple-400">school</span>
             </div>
             <h1 className="text-2xl font-bold text-white">Instructor Portal</h1>
-            <p className="text-text-muted">Staff Login</p>
+            <p className="text-text-muted">Authorized Staff Only</p>
         </div>
         
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -44,7 +44,7 @@ export const InstructorLogin: React.FC = () => {
                 />
             </div>
             
-            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">Invalid access code. Try 'teach'.</p>}
+            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">Invalid Access Code</p>}
             
             <button 
                 type="submit"
@@ -53,10 +53,6 @@ export const InstructorLogin: React.FC = () => {
                 Start Session
             </button>
         </form>
-        
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-             <p className="text-[10px] text-slate-600">Default password: <strong>teach</strong></p>
-        </div>
       </div>
     </div>
   );

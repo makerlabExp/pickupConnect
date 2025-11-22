@@ -27,8 +27,8 @@ export const AdminLogin: React.FC = () => {
             <div className="h-16 w-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 ring-4 ring-slate-800 ring-offset-4 ring-offset-slate-900">
                 <span className="material-symbols-outlined text-3xl text-slate-300">admin_panel_settings</span>
             </div>
-            <h1 className="text-2xl font-bold text-white">Admin & Setup Portal</h1>
-            <p className="text-text-muted text-center mt-1">Configure system and manage users</p>
+            <h1 className="text-2xl font-bold text-white">Admin Access</h1>
+            <p className="text-text-muted text-center mt-1">Restricted Area</p>
         </div>
         
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -44,19 +44,15 @@ export const AdminLogin: React.FC = () => {
                 />
             </div>
             
-            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">Invalid password. Try 'admin'.</p>}
+            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">Access Denied</p>}
             
             <button 
                 type="submit"
                 className="mt-4 w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20"
             >
-                Login to Setup
+                Login
             </button>
         </form>
-        
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-             <p className="text-[10px] text-slate-600">Default password: <strong>admin</strong></p>
-        </div>
       </div>
     </div>
   );
