@@ -32,10 +32,11 @@ export const SetupView: React.FC = () => {
                       // Save immediately
                       saveCredentials(loadedUrl, loadedKey);
                       
-                      // Visual feedback then reload
+                      // Visual feedback then reload to HOME
                       setTimeout(() => {
-                         // Force a full page reload to ensure clean state with new env vars
-                         window.location.href = window.location.origin + window.location.pathname;
+                         // Redirect to root (HomeView) instead of current setup path
+                         window.location.href = window.location.origin + '/#/';
+                         window.location.reload();
                       }, 1500);
                   }
               }
@@ -126,7 +127,7 @@ alter table sessions disable row level security;`;
                       {status === 'testing' ? 'Synchronizing App...' : status === 'error' ? 'Setup Failed' : 'Connected!'}
                   </h1>
                   <p className="text-text-muted text-center max-w-xs">
-                      {status === 'testing' ? 'Applying security settings from link...' : status === 'error' ? 'The link is invalid or expired.' : 'Redirecting you to the app...'}
+                      {status === 'testing' ? 'Applying security settings from link...' : status === 'error' ? 'The link is invalid or expired.' : 'Redirecting you to the main menu...'}
                   </p>
               </div>
           </div>

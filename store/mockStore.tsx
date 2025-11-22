@@ -4,7 +4,7 @@ import { getSupabase, getStoredCredentials } from '../services/firebase';
 import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage } from '../types';
 import { setSystemMute } from '../services/soundService';
 
-// --- MOCK DATA (Offline Fallback / Seeding) ---
+// --- MOCK DATA (Only used when explicitly seeded by Admin) ---
 const MOCK_STUDENTS: Student[] = [
   { id: 's1', name: 'Leo', accessCode: '1234', parentId: 'p1', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo', classroom: 'Salle 1' },
   { id: 's2', name: 'Mia', accessCode: '5678', parentId: 'p2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia', classroom: 'Salle DIY' },
@@ -86,11 +86,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [isMuted, setIsMuted] = useState(false);
 
-  // Initialize with Mock data to ensure app works "Offline" / "Demo" by default
-  // If configured, we will overwrite this with real data (or empty array) to avoid confusion
-  const [students, setStudents] = useState<Student[]>(isConfigured ? [] : MOCK_STUDENTS);
-  const [parents, setParents] = useState<Parent[]>(isConfigured ? [] : MOCK_PARENTS);
-  const [sessions, setSessions] = useState<Session[]>([DEFAULT_SESSION]);
+  // PRODUCTION CHANGE: Initialize with empty arrays. No mock data by default.
+  const [students, setStudents] = useState<Student[]>([]);
+  const [parents, setParents] = useState<Parent[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [pickupQueue, setPickupQueue] = useState<PickupRequest[]>([]);
 
   // Derived state: Active Session
@@ -121,16 +120,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshData = useCallback(async () => {
     const supabase = getSupabase();
     if (!supabase) {
-        // If connection failed or lost, fallback to mock if empty
-        if (students.length === 0 && !isConfigured) setStudents(MOCK_STUDENTS);
+        // If no DB, we do NOT load mock data automatically anymore.
+        // We want a clean state for production.
         return;
     }
 
-    // If we have a supabase client, WE USE IT. 
-    // We overwrite local state completely to ensure "Real Mode" consistency.
-
     const s = await supabase.from('students').select('*');
-    // If data exists, use it. If empty (but connected), use empty array to show "No Students Found" instead of Mock data.
     if (s.data) setStudents(s.data); 
 
     const p = await supabase.from('parents').select('*');
@@ -140,9 +135,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (pk.data) setPickupQueue(pk.data);
 
     const sess = await supabase.from('sessions').select('*');
-    if (sess.data && sess.data.length > 0) setSessions(sess.data);
+    if (sess.data) setSessions(sess.data);
 
-  }, [isConfigured, students.length]);
+  }, []);
+
+
+  // --- STALE SESSION CHECK ---
+  // If we have an activeStudentId in local storage, but that student does not exist in the fetched data,
+  // we must logout to prevent the "Ghost Account" issue (e.g. seeing Mia when Mia doesn't exist).
+  useEffect(() => {
+      if (students.length > 0 && activeStudentId) {
+          const exists = students.find(s => s.id === activeStudentId);
+          if (!exists) {
+              console.warn("Active session invalid (student not found). Logging out.");
+              setActiveStudentId(null);
+              localStorage.removeItem('activeStudentId');
+          }
+      }
+      if (parents.length > 0 && activeParentId) {
+        const exists = parents.find(p => p.id === activeParentId);
+        if (!exists) {
+            console.warn("Active session invalid (parent not found). Logging out.");
+            setActiveParentId(null);
+            localStorage.removeItem('activeParentId');
+        }
+    }
+  }, [students, parents, activeStudentId, activeParentId]);
 
 
   // --- SUPABASE REALTIME SUBSCRIPTIONS ---
@@ -215,7 +233,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [students, parents]);
 
   const loginAdmin = useCallback((password: string) => {
-      // Simple hardcoded auth for demo/MVP
       if (password === 'admin') {
           setIsAdminLoggedIn(true);
           localStorage.setItem('adminAuth', 'true');
@@ -405,7 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const seedDatabase = useCallback(async () => {
-      // Local Seed
+      // Explicit Seed Action
       setStudents(MOCK_STUDENTS);
       setParents(MOCK_PARENTS);
       setSessions([DEFAULT_SESSION]);
@@ -425,7 +442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.error("Seeding failed", e);
           }
       }
-      alert("Database seeded (Offline & Online where available)!");
+      alert("Test data seeded.");
   }, [refreshData]);
 
   const resetSystem = useCallback(async () => {
@@ -447,7 +464,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetConfiguration = useCallback(() => {
       localStorage.removeItem('supabase_url');
       localStorage.removeItem('supabase_anon_key');
-      // Removed Gemini Key management
       setIsConfigured(false);
   }, []);
 

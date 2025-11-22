@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter, Routes, Route, Link } from 'react-router-dom';
 import { AppProvider, useAppStore } from './store/mockStore';
@@ -9,6 +10,7 @@ import { AdminView } from './components/AdminView';
 import { SetupView } from './components/SetupView';
 import { AdminLogin } from './components/AdminLogin';
 import { InstructorLogin } from './components/InstructorLogin';
+import { HomeView } from './components/HomeView';
 
 const SimulationLayout: React.FC = () => {
     const { activeStudentId, students } = useAppStore();
@@ -116,11 +118,10 @@ const App: React.FC = () => {
         <AppProvider>
             <HashRouter>
                 <Routes>
-                    {/* Default route is now Admin (which shows Login or Dashboard) */}
-                    <Route path="/" element={<AdminRoute />} />
-                    <Route path="/admin" element={<AdminRoute />} />
+                    <Route path="/" element={<HomeView />} />
                     
                     {/* Role specific routes */}
+                    <Route path="/admin" element={<AdminRoute />} />
                     <Route path="/parent" element={<ParentView />} />
                     <Route path="/student" element={<StudentRoute />} />
                     <Route path="/instructor" element={<InstructorRoute />} />
