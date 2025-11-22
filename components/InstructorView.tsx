@@ -1,19 +1,19 @@
-import React, { useEffect, useState, useRef } from 'react';
+
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { generateAudioAnnouncement } from '../services/geminiService';
-import { playGeminiAudio, initAudioContext } from '../services/ttsService';
+import { playGeminiAudio } from '../services/ttsService';
 import { playSound } from '../services/soundService';
 import { PickupRequest } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 export const InstructorView: React.FC = () => {
   const { pickupQueue, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute, updatePickupStatus } = useAppStore();
-  const [processingId, setProcessingId] = useState<string | null>(null);
   const [filterClassroom, setFilterClassroom] = useState<string>('ALL');
   const navigate = useNavigate();
   const processingRef = useRef<Set<string>>(new Set());
 
-  const activeRequests = pickupQueue
+  const activeRequests = useMemo(() => pickupQueue
     .filter(r => r.status !== 'scheduled' && r.status !== 'completed')
     .filter(r => {
         if (filterClassroom === 'ALL') return true;
@@ -24,11 +24,11 @@ export const InstructorView: React.FC = () => {
         if (a.status === 'released' && b.status !== 'released') return 1;
         if (a.status !== 'released' && b.status === 'released') return -1;
         return b.timestamp - a.timestamp;
-    });
+    }), [pickupQueue, students, filterClassroom]);
 
   const playAndCacheAudio = async (req: PickupRequest) => {
       try {
-        let audioBase64 = req.audioBase64;
+        let audioBase64: string | null | undefined = req.audioBase64;
         if (!audioBase64) {
             const student = students.find(s => s.id === req.studentId);
             const parent = parents.find(p => p.id === req.parentId);
@@ -46,11 +46,9 @@ export const InstructorView: React.FC = () => {
       for (const req of activeRequests) {
         if (req.status === 'arrived' && !req.hasAnnounced && !processingRef.current.has(req.id)) {
           processingRef.current.add(req.id);
-          setProcessingId(req.id);
           playSound.notification();
           await new Promise(r => setTimeout(r, 500));
           await playAndCacheAudio(req);
-          setProcessingId(null);
           processingRef.current.delete(req.id);
         }
       }

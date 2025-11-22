@@ -11,6 +11,7 @@ import { SetupView } from './components/SetupView';
 import { AdminLogin } from './components/AdminLogin';
 import { InstructorLogin } from './components/InstructorLogin';
 import { HomeView } from './components/HomeView';
+import { InstallPWA } from './components/InstallPWA';
 
 const SimulationLayout: React.FC = () => {
     const { activeStudentId, students } = useAppStore();
@@ -116,6 +117,7 @@ const InstructorRoute = () => {
 const App: React.FC = () => {
     return (
         <AppProvider>
+            <InstallPWA />
             <HashRouter>
                 <Routes>
                     <Route path="/" element={<HomeView />} />
