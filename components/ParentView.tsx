@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
@@ -9,20 +8,25 @@ export const ParentView: React.FC = () => {
   // --- Login State ---
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
+  
+  // --- Tab State (Home, Chat, Profile) ---
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
+
+  // --- Chat State ---
   const [messageInput, setMessageInput] = useState('');
-  const [timeLeft, setTimeLeft] = useState<{h: number, m: number, s: number}>({ h: 0, m: 0, s: 0 });
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // --- Timer State ---
+  const [timeLeft, setTimeLeft] = useState<{h: number, m: number, s: number}>({ h: 0, m: 0, s: 0 });
 
   // --- Timer Logic ---
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       const diff = Math.max(0, currentSession.endTime - now);
-      
       const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const m = Math.floor((diff / (1000 * 60)) % 60);
       const s = Math.floor((diff / 1000) % 60);
-      
       setTimeLeft({ h, m, s });
     }, 1000);
     return () => clearInterval(interval);
@@ -42,100 +46,107 @@ export const ParentView: React.FC = () => {
       }
   };
 
-  // Determine current user based on store
+  // Determine current user
   const currentUser = parents.find(p => p.id === activeParentId);
-  // Find TODAY's pickup request. The store filters pickupQueue to today mostly, but verify.
   const currentPickup = pickupQueue.find(p => p.studentId === currentUser?.studentId);
-  
+  const status = currentPickup?.status || 'scheduled';
+  const chatHistory = currentPickup?.chatHistory || [];
+
   // Auto-scroll chat
   useEffect(() => {
-    if (chatContainerRef.current) {
+    if (activeTab === 'chat' && chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [currentPickup?.chatHistory?.length]);
+  }, [activeTab, chatHistory.length]);
 
-  // Sound notification for new messages from student
-  const prevMsgCount = useRef(currentPickup?.chatHistory?.length || 0);
+  // Sound notification logic
+  const prevMsgCount = useRef(chatHistory.length);
   useEffect(() => {
-      const count = currentPickup?.chatHistory?.length || 0;
+      const count = chatHistory.length;
       if (count > prevMsgCount.current) {
-          const lastMsg = currentPickup?.chatHistory[count - 1];
+          const lastMsg = chatHistory[count - 1];
           if (lastMsg?.sender === 'student') {
               playSound.notification();
           }
       }
       prevMsgCount.current = count;
-  }, [currentPickup?.chatHistory]);
+  }, [chatHistory]);
 
+  const handleSendMessage = () => {
+    if (messageInput.trim()) {
+      playSound.click();
+      sendMessage(currentUser!.studentId, messageInput, 'parent');
+      setMessageInput('');
+    }
+  };
 
-  // --- IF NOT LOGGED IN: Show Login Screen ---
+  const handleStatusUpdate = (newStatus: 'on_way' | 'arrived' | 'completed') => {
+    playSound.click();
+    if (newStatus === 'completed') playSound.success();
+    updatePickupStatus(currentUser!.studentId, newStatus);
+  };
+
+  // --- UNLOGGED VIEW ---
   if (!currentUser) {
       return (
-          <div className="flex min-h-screen w-full flex-col bg-primary text-text-light font-display">
-               <div className="flex items-center justify-center p-4">
-                <h1 className="text-lg font-bold text-center">Parent Access</h1>
-               </div>
-
-               <div className="flex-1 flex flex-col items-center justify-center p-8">
-                   <div className="mb-8 p-6 rounded-full bg-surface-dark ring-1 ring-white/10">
-                       <span className="material-symbols-outlined text-6xl text-blue-400">family_restroom</span>
+          <div className="flex h-[100dvh] w-full flex-col bg-primary text-text-light font-display overflow-hidden">
+               <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
+                   <div className="mb-8 p-6 rounded-3xl bg-surface-dark shadow-2xl border border-white/10 relative overflow-hidden">
+                       <div className="absolute inset-0 bg-blue-500/10 blur-xl"></div>
+                       <span className="material-symbols-outlined text-6xl text-blue-400 relative z-10">family_restroom</span>
                    </div>
                    
-                   <h2 className="text-2xl font-bold mb-2">Welcome, Parent!</h2>
-                   <p className="text-text-muted text-center mb-8">Enter your child's access code to connect to the workshop.</p>
+                   <h2 className="text-2xl font-bold mb-2">Welcome Parent</h2>
+                   <p className="text-text-muted text-center mb-8 text-sm">Enter your 4-digit family access code.</p>
                    
                    <form onSubmit={handleLogin} className="w-full max-w-xs flex flex-col gap-4">
-                       <input 
-                           type="text" 
-                           maxLength={4}
-                           inputMode="numeric"
-                           value={code}
-                           onChange={(e) => setCode(e.target.value)}
-                           placeholder="Student Code (e.g. 4492)"
-                           className={`
-                               w-full bg-surface-dark border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-widest text-white focus:outline-none transition-colors
-                               ${error ? 'border-warning' : 'border-slate-700 focus:border-accent'}
-                           `}
-                       />
-                       {error && <p className="text-warning text-sm text-center font-medium">Invalid code. Please try again.</p>}
+                       <div className="relative">
+                           <input 
+                               type="text" 
+                               maxLength={4}
+                               inputMode="numeric"
+                               value={code}
+                               onChange={(e) => setCode(e.target.value)}
+                               placeholder="0 0 0 0"
+                               className={`
+                                   w-full bg-surface-dark border rounded-2xl px-4 py-5 text-center text-3xl font-bold tracking-[0.5em] text-white focus:outline-none transition-all shadow-inner
+                                   ${error ? 'border-red-500 text-red-500' : 'border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'}
+                               `}
+                           />
+                       </div>
+                       {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">Invalid code</p>}
                        
                        <button 
                             type="submit"
                             disabled={code.length < 4}
                             className={`
-                                w-full py-4 rounded-xl font-bold text-lg transition-all
-                                ${code.length === 4 ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}
+                                w-full py-4 rounded-2xl font-bold text-lg transition-all shadow-lg
+                                ${code.length === 4 ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-500/25' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}
                             `}
                        >
                            Connect
                        </button>
                    </form>
-                   
-                   <p className="mt-8 text-xs text-slate-600">Use the code provided in the welcome email.</p>
                </div>
           </div>
       );
   }
 
-  // --- IF LOGGED IN: Show Dashboard ---
-  const status = currentPickup?.status || 'scheduled';
-  const chatHistory = currentPickup?.chatHistory || [];
-
-  // Handle Finished State (Completed)
+  // --- COMPLETED VIEW ---
   if (status === 'completed') {
       return (
-          <div className="flex min-h-screen w-full flex-col items-center justify-center bg-primary p-6 text-text-light font-display">
-              <div className="w-full max-w-md bg-surface-dark border border-white/10 rounded-3xl p-8 text-center shadow-2xl">
+          <div className="flex h-[100dvh] w-full flex-col items-center justify-center bg-primary p-6 text-text-light font-display">
+              <div className="w-full max-w-md bg-surface-dark border border-white/10 rounded-3xl p-8 text-center shadow-2xl animate-in zoom-in duration-300">
                   <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
                       <span className="material-symbols-outlined text-4xl">check_circle</span>
                   </div>
-                  <h1 className="text-2xl font-bold mb-2">Pickup Confirmed!</h1>
-                  <p className="text-slate-400 mb-8">
-                      Thank you for confirming. Have a wonderful evening!
+                  <h1 className="text-2xl font-bold mb-2">Pickup Complete</h1>
+                  <p className="text-slate-400 mb-8 text-sm">
+                      Have a wonderful evening!
                   </p>
                   <button 
                       onClick={() => logout()}
-                      className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold hover:bg-slate-700 transition-colors"
+                      className="w-full py-4 rounded-2xl bg-slate-800 text-white font-bold active:scale-95 transition-transform"
                   >
                       Close App
                   </button>
@@ -144,194 +155,215 @@ export const ParentView: React.FC = () => {
       )
   }
 
-  const handleSendMessage = () => {
-    if (messageInput.trim()) {
-      playSound.click();
-      sendMessage(currentUser.studentId, messageInput, 'parent');
-      setMessageInput('');
-    }
-  };
-
-  const handleStatusUpdate = (newStatus: 'on_way' | 'arrived' | 'completed') => {
-    playSound.click();
-    if (newStatus === 'completed') {
-        playSound.success();
-    }
-    updatePickupStatus(currentUser.studentId, newStatus);
-  };
-
+  // --- MAIN LOGGED IN LAYOUT ---
   return (
-    <div className="relative flex min-h-screen w-full flex-col bg-primary text-text-light overflow-x-hidden font-display">
-      {/* App Bar */}
-      <div className="flex items-center bg-primary/80 backdrop-blur-sm p-4 pb-2 justify-between shadow-md z-10 sticky top-0 border-b border-white/5">
-        <div className="flex items-center gap-3 flex-1">
-            <div className="flex size-12 shrink-0 items-center">
-            <div 
-                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 ring-2 ring-surface-dark" 
-                style={{ backgroundImage: `url("${currentUser.avatarUrl}")` }}
-            />
-            </div>
-            <div className="flex flex-col leading-tight">
-                <h2 className="text-text-light text-lg font-bold">Hello, {currentUser.name}</h2>
-                <p className="text-xs text-text-muted">Connected to Student ID: {currentUser.studentId}</p>
-            </div>
-        </div>
-        
-        <button onClick={() => { playSound.click(); logout(); }} className="flex size-10 items-center justify-center rounded-full bg-surface-dark text-text-muted hover:text-white transition-colors">
-          <span className="material-symbols-outlined text-xl">logout</span>
-        </button>
+    <div className="flex h-[100dvh] w-full flex-col bg-primary text-text-light font-display overflow-hidden">
+      
+      {/* HEADER (Common) */}
+      <div className="shrink-0 flex items-center justify-between p-4 pt-safe-top bg-primary/90 backdrop-blur-md z-20 border-b border-white/5">
+           <div className="flex items-center gap-3">
+                <img src={currentUser.avatarUrl} className="w-10 h-10 rounded-full bg-slate-700 object-cover ring-2 ring-surface-dark" />
+                <div>
+                    <h2 className="font-bold text-sm leading-tight">{currentUser.name}</h2>
+                    <p className="text-[10px] text-text-muted">ID: {currentUser.studentId}</p>
+                </div>
+           </div>
+           <div className="px-3 py-1 rounded-full bg-surface-dark border border-white/5 flex items-center gap-2">
+               <span className="material-symbols-outlined text-xs text-text-muted">schedule</span>
+               <span className="text-xs font-mono font-bold">{String(timeLeft.h).padStart(2,'0')}:{String(timeLeft.m).padStart(2,'0')}</span>
+           </div>
       </div>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4 pt-6 pb-32">
+      {/* CONTENT AREA (Scrollable) */}
+      <div className="flex-1 overflow-y-auto relative overscroll-none">
         
-        {/* Workshop Card */}
-        <div className="flex flex-col rounded-2xl bg-surface-dark shadow-lg overflow-hidden mb-6 border border-white/5">
-          <div 
-            className="w-full aspect-[2.5/1] bg-cover bg-center"
-            style={{ backgroundImage: `url("${currentSession.imageUrl}")` }}
-          />
-          <div className="flex items-end justify-between p-4">
-            <div>
-                <p className="text-text-muted text-xs uppercase tracking-wider font-bold mb-1">Current Workshop</p>
-                <p className="text-text-light text-lg font-bold leading-tight">{currentSession.title}</p>
-            </div>
-             {/* Timer Mini */}
-            <div className="flex gap-2 text-center">
-                <div className="bg-slate-800 px-2 py-1 rounded">
-                    <span className="text-white font-mono font-bold text-sm">{String(timeLeft.h).padStart(2,'0')}</span>
-                </div>
-                <span className="text-white font-bold">:</span>
-                <div className="bg-slate-800 px-2 py-1 rounded">
-                    <span className="text-white font-mono font-bold text-sm">{String(timeLeft.m).padStart(2,'0')}</span>
-                </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Interface */}
-        <div className="flex flex-col gap-3 mb-6">
-            <div className="flex items-center justify-between px-1">
-               <h3 className="text-text-light text-xs font-bold uppercase tracking-wider opacity-70">Conversation</h3>
-               <span className="text-[10px] text-text-muted bg-surface-dark px-2 py-1 rounded-full border border-white/5">Live</span>
-            </div>
-            
-            <div className="bg-surface-dark rounded-[1.5rem] border border-white/5 overflow-hidden flex flex-col shadow-inner h-96 relative">
-                 <div 
-                    ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 scroll-smooth pb-20"
-                 >
-                    {chatHistory.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-text-muted opacity-50 gap-2">
-                            <span className="material-symbols-outlined text-3xl">chat_bubble_outline</span>
-                            <p className="text-sm">Send a message to start</p>
-                        </div>
-                    ) : (
-                        chatHistory.map((msg) => {
-                            const isMe = msg.sender === 'parent';
-                            return (
-                                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                                        isMe 
-                                        ? 'bg-blue-600 text-white rounded-br-none' 
-                                        : 'bg-slate-700/80 text-white rounded-bl-none'
-                                    }`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                 </div>
-                 
-                 {/* Floating Pill Input - Positioned absolutely at the bottom of the card container */}
-                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent">
-                    <div className="flex items-end gap-2">
-                        <div className="flex-1 bg-slate-800/80 backdrop-blur-md rounded-[1.5rem] ring-1 ring-white/10 focus-within:ring-blue-500/50 focus-within:ring-2 transition-all flex items-center shadow-lg">
-                            <input 
-                                className="w-full bg-transparent border-none px-5 py-3 text-sm text-text-light placeholder:text-slate-500 focus:ring-0"
-                                placeholder="Message your child..."
-                                value={messageInput}
-                                onChange={(e) => setMessageInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            />
-                        </div>
-                        <button 
-                            onClick={handleSendMessage}
-                            disabled={!messageInput.trim()}
-                            className={`h-[46px] w-[46px] shrink-0 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                                messageInput.trim() 
-                                ? 'bg-blue-600 text-white hover:scale-105 hover:bg-blue-500' 
-                                : 'bg-slate-800 text-white/20 cursor-not-allowed ring-1 ring-white/5'
-                            }`}
-                        >
-                            <span className="material-symbols-outlined text-xl">send</span>
-                        </button>
+        {/* --- HOME TAB --- */}
+        {activeTab === 'home' && (
+            <div className="p-5 flex flex-col gap-6 min-h-full pb-24 animate-in slide-in-from-right-8 duration-300">
+                
+                {/* Workshop Card (Compact) */}
+                <div className="rounded-2xl bg-surface-dark overflow-hidden shadow-lg border border-white/5 shrink-0 relative group">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
+                    <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `url("${currentSession.imageUrl}")` }} />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
+                        <p className="text-[10px] font-bold text-accent uppercase tracking-wider mb-0.5">Ongoing Session</p>
+                        <h3 className="text-lg font-bold text-white leading-none">{currentSession.title}</h3>
                     </div>
-                 </div>
-            </div>
-        </div>
+                </div>
 
-        {/* Pickup Actions */}
-        <h3 className="text-text-light text-sm font-bold uppercase tracking-wider opacity-70 mb-3 px-1">Status Controls</h3>
-        
-        {status === 'released' ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl mb-4">
-                     <div className="flex gap-3 items-center">
-                         <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                             <span className="material-symbols-outlined text-emerald-400">check</span>
+                {/* Action Area */}
+                <div className="flex-1 flex flex-col justify-end gap-4">
+                    {status === 'released' ? (
+                         <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-3xl text-center animate-pulse">
+                             <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30">
+                                 <span className="material-symbols-outlined text-3xl text-white">child_care</span>
+                             </div>
+                             <h2 className="text-2xl font-bold text-white mb-2">Student Released</h2>
+                             <p className="text-emerald-200/70 text-sm mb-6">Instructor has sent them out.</p>
+                             
+                             <button
+                                onClick={() => handleStatusUpdate('completed')}
+                                className="w-full py-5 rounded-2xl font-bold text-lg bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                             >
+                                <span className="material-symbols-outlined">check_circle</span>
+                                Confirm Pickup
+                             </button>
                          </div>
-                         <div>
-                             <h4 className="font-bold text-emerald-400">Child Released</h4>
-                             <p className="text-xs text-emerald-200/70">Instructor has sent your child out.</p>
-                         </div>
-                     </div>
-                 </div>
-                 <button
-                    onClick={() => handleStatusUpdate('completed')}
-                    className="w-full h-20 flex items-center justify-center rounded-2xl font-bold text-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:scale-[1.02] active:scale-95 transition-all"
-                 >
-                    <span className="mr-3 material-symbols-outlined text-2xl">how_to_reg</span>
-                    Confirm I have my child
-                 </button>
-            </div>
-        ) : (
-            <div className="flex flex-col gap-3">
-            <button
-                onClick={() => handleStatusUpdate('on_way')}
-                disabled={status === 'on_way' || status === 'arrived'}
-                className={`
-                w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
-                ${status === 'on_way' || status === 'arrived' 
-                    ? 'bg-warning text-primary opacity-100 shadow-[0_0_20px_rgba(245,158,11,0.3)] ring-2 ring-warning' 
-                    : 'bg-surface-dark hover:bg-surface-dark/80 text-text-muted border border-white/5'
-                }
-                `}
-            >
-                <span className="mr-3 material-symbols-outlined text-2xl">local_taxi</span>
-                {status === 'on_way' ? "Status: On My Way" : "I'm leaving now"}
-            </button>
+                    ) : (
+                        <div className="grid gap-4">
+                            <button
+                                onClick={() => handleStatusUpdate('on_way')}
+                                disabled={status === 'on_way' || status === 'arrived'}
+                                className={`
+                                h-20 w-full rounded-2xl font-bold text-left px-6 relative overflow-hidden transition-all active:scale-[0.98] flex items-center gap-4
+                                ${status === 'on_way' || status === 'arrived'
+                                    ? 'bg-warning text-slate-900 shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-warning'
+                                    : 'bg-surface-dark text-slate-400 border border-white/5 hover:bg-white/5'}
+                                `}
+                            >
+                                <span className="material-symbols-outlined text-3xl">local_taxi</span>
+                                <div>
+                                    <span className="block text-sm uppercase tracking-wider opacity-70">Step 1</span>
+                                    <span className="text-lg">{status === 'on_way' ? "Status: On My Way" : "I'm leaving now"}</span>
+                                </div>
+                                {(status === 'on_way' || status === 'arrived') && <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 opacity-20 text-6xl">check</span>}
+                            </button>
 
-            <button
-                onClick={() => handleStatusUpdate('arrived')}
-                disabled={status === 'arrived'}
-                className={`
-                w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
-                ${status === 'arrived'
-                    ? 'bg-accent text-primary shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-accent'
-                    : status === 'on_way' 
-                    ? 'bg-surface-dark text-text-light border-2 border-accent hover:bg-accent hover:text-primary shadow-lg'
-                    : 'bg-surface-dark text-text-muted opacity-50 cursor-not-allowed border border-white/5'
-                }
-                `}
-            >
-                <span className="mr-3 material-symbols-outlined text-2xl">location_on</span>
-                {status === 'arrived' ? "Status: Arrived" : "I'm here / Outside"}
-            </button>
+                            <button
+                                onClick={() => handleStatusUpdate('arrived')}
+                                disabled={status === 'arrived'}
+                                className={`
+                                h-24 w-full rounded-2xl font-bold text-left px-6 relative overflow-hidden transition-all active:scale-[0.98] flex items-center gap-4
+                                ${status === 'arrived'
+                                    ? 'bg-accent text-slate-900 shadow-[0_0_30px_rgba(16,185,129,0.3)] ring-1 ring-accent'
+                                    : status === 'on_way' 
+                                        ? 'bg-surface-dark text-white border-2 border-accent shadow-lg'
+                                        : 'bg-surface-dark text-slate-600 border border-white/5 opacity-50'}
+                                `}
+                            >
+                                <span className="material-symbols-outlined text-3xl">location_on</span>
+                                <div>
+                                    <span className="block text-sm uppercase tracking-wider opacity-70">Step 2</span>
+                                    <span className="text-xl">{status === 'arrived' ? "Status: Arrived" : "I'm here"}</span>
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         )}
+
+        {/* --- CHAT TAB --- */}
+        {activeTab === 'chat' && (
+            <div className="flex flex-col h-full animate-in slide-in-from-right-8 duration-300">
+                 <div 
+                    ref={chatContainerRef}
+                    className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col gap-4"
+                 >
+                    {chatHistory.length === 0 && (
+                        <div className="mt-20 text-center opacity-30">
+                            <span className="material-symbols-outlined text-4xl mb-2">chat</span>
+                            <p className="text-sm">Send a message to your child.</p>
+                        </div>
+                    )}
+                    {chatHistory.map((msg) => {
+                        const isMe = msg.sender === 'parent';
+                        return (
+                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                    isMe 
+                                    ? 'bg-blue-600 text-white rounded-br-sm' 
+                                    : 'bg-surface-dark text-white rounded-bl-sm border border-white/10'
+                                }`}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        );
+                    })}
+                 </div>
+                 
+                 {/* Input is fixed in the layout via flex, but visually distinct */}
+                 <div className="absolute bottom-20 left-0 right-0 p-3 bg-gradient-to-t from-primary via-primary to-transparent z-10">
+                     <div className="flex gap-2">
+                         <input 
+                            value={messageInput}
+                            onChange={(e) => setMessageInput(e.target.value)}
+                            className="flex-1 bg-surface-dark border border-white/10 rounded-full px-5 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-lg"
+                            placeholder="Type a message..."
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                         />
+                         <button 
+                            onClick={handleSendMessage}
+                            disabled={!messageInput.trim()}
+                            className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-lg ${messageInput.trim() ? 'bg-blue-600 text-white' : 'bg-surface-dark text-slate-600'}`}
+                         >
+                             <span className="material-symbols-outlined">send</span>
+                         </button>
+                     </div>
+                 </div>
+            </div>
+        )}
+
+        {/* --- PROFILE TAB --- */}
+        {activeTab === 'profile' && (
+            <div className="p-6 animate-in slide-in-from-right-8 duration-300">
+                <h2 className="text-xl font-bold mb-6">Settings</h2>
+                <div className="bg-surface-dark rounded-2xl border border-white/5 overflow-hidden">
+                    <div className="p-4 flex items-center gap-4 border-b border-white/5">
+                        <div className="h-12 w-12 rounded-full bg-slate-700 flex items-center justify-center">
+                            <span className="material-symbols-outlined">person</span>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold">{currentUser.name}</h3>
+                            <p className="text-xs text-text-muted">Parent Account</p>
+                        </div>
+                    </div>
+                    <button onClick={() => logout()} className="w-full p-4 text-left text-red-400 hover:bg-white/5 transition-colors flex items-center gap-3">
+                        <span className="material-symbols-outlined">logout</span>
+                        Logout
+                    </button>
+                </div>
+                
+                <div className="mt-6 text-center">
+                    <p className="text-xs text-slate-600">MakerLab Connect v1.1</p>
+                </div>
+            </div>
+        )}
+
       </div>
+
+      {/* BOTTOM NAVIGATION BAR (Fixed) */}
+      <div className="shrink-0 h-20 bg-surface-dark/90 backdrop-blur-xl border-t border-white/5 flex justify-around items-center pb-safe-bottom z-30 shadow-2xl">
+           <button 
+             onClick={() => setActiveTab('home')}
+             className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-slate-500'}`}
+           >
+               <span className={`material-symbols-outlined text-2xl transition-transform ${activeTab === 'home' ? 'scale-110 fill-current' : ''}`}>dashboard</span>
+               <span className="text-[10px] font-bold">Dashboard</span>
+           </button>
+
+           <button 
+             onClick={() => setActiveTab('chat')}
+             className={`flex flex-col items-center gap-1 p-2 transition-colors relative ${activeTab === 'chat' ? 'text-white' : 'text-slate-500'}`}
+           >
+               <div className="relative">
+                   <span className={`material-symbols-outlined text-2xl transition-transform ${activeTab === 'chat' ? 'scale-110' : ''}`}>chat_bubble</span>
+                   {chatHistory.length > 0 && chatHistory[chatHistory.length-1].sender === 'student' && (
+                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-surface-dark"></span>
+                   )}
+               </div>
+               <span className="text-[10px] font-bold">Chat</span>
+           </button>
+
+           <button 
+             onClick={() => setActiveTab('profile')}
+             className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'profile' ? 'text-white' : 'text-slate-500'}`}
+           >
+               <span className={`material-symbols-outlined text-2xl transition-transform ${activeTab === 'profile' ? 'scale-110' : ''}`}>person</span>
+               <span className="text-[10px] font-bold">Profile</span>
+           </button>
+      </div>
+
     </div>
   );
 };
