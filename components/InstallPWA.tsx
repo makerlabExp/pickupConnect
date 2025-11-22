@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 export const InstallPWA: React.FC = () => {
   const [supportsPWA, setSupportsPWA] = useState(false);
   const [promptInstall, setPromptInstall] = useState<any>(null);
-  const [isIOS, setIsIOS] = useState(false);
   const [showIOSPrompt, setShowIOSPrompt] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -18,7 +17,6 @@ export const InstallPWA: React.FC = () => {
     // Check for iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(isIosDevice);
 
     if (isIosDevice) {
         // Show iOS prompt after a short delay if not closed before
