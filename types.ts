@@ -1,7 +1,7 @@
 
 export type UserRole = 'parent' | 'student' | 'instructor' | 'admin';
 
-export type PickupStatus = 'scheduled' | 'on_way' | 'arrived' | 'dismissed';
+export type PickupStatus = 'scheduled' | 'on_way' | 'arrived' | 'released' | 'completed';
 
 export type Classroom = 'Salle 1' | 'Salle 2' | 'Salle DIY';
 

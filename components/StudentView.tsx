@@ -17,7 +17,7 @@ export const StudentView: React.FC = () => {
   const prevStatusRef = useRef(status);
   useEffect(() => {
     if (prevStatusRef.current !== status) {
-      if (status === 'on_way' || status === 'arrived') {
+      if (status === 'on_way' || status === 'arrived' || status === 'released') {
         playSound.notification();
       }
       prevStatusRef.current = status;
@@ -84,7 +84,15 @@ export const StudentView: React.FC = () => {
       title: 'Parent is Here!',
       sub: 'Go to the pickup point'
     },
-    dismissed: {
+    released: {
+      icon: 'door_open',
+      color: 'text-white',
+      bg: 'bg-gradient-to-r from-blue-500 to-indigo-600',
+      border: 'border-blue-400/50',
+      title: 'You can leave now!',
+      sub: 'Go meet your parent outside'
+    },
+    completed: {
         icon: 'check_circle',
         color: 'text-text-muted',
         bg: 'bg-surface-dark',
@@ -94,7 +102,7 @@ export const StudentView: React.FC = () => {
       }
   };
 
-  const currentConfig = statusConfig[status];
+  const currentConfig = statusConfig[status] || statusConfig.scheduled;
 
   return (
     <div className="relative flex h-[100dvh] w-full flex-col bg-primary font-display overflow-hidden text-text-light">

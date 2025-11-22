@@ -44,6 +44,7 @@ export const ParentView: React.FC = () => {
 
   // Determine current user based on store
   const currentUser = parents.find(p => p.id === activeParentId);
+  // Find TODAY's pickup request. The store filters pickupQueue to today mostly, but verify.
   const currentPickup = pickupQueue.find(p => p.studentId === currentUser?.studentId);
   
   // Auto-scroll chat
@@ -120,6 +121,29 @@ export const ParentView: React.FC = () => {
   const status = currentPickup?.status || 'scheduled';
   const chatHistory = currentPickup?.chatHistory || [];
 
+  // Handle Finished State (Completed)
+  if (status === 'completed') {
+      return (
+          <div className="flex min-h-screen w-full flex-col items-center justify-center bg-primary p-6 text-text-light font-display">
+              <div className="w-full max-w-md bg-surface-dark border border-white/10 rounded-3xl p-8 text-center shadow-2xl">
+                  <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <span className="material-symbols-outlined text-4xl">check_circle</span>
+                  </div>
+                  <h1 className="text-2xl font-bold mb-2">Pickup Confirmed!</h1>
+                  <p className="text-slate-400 mb-8">
+                      Thank you for confirming. Have a wonderful evening!
+                  </p>
+                  <button 
+                      onClick={() => logout()}
+                      className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold hover:bg-slate-700 transition-colors"
+                  >
+                      Close App
+                  </button>
+              </div>
+          </div>
+      )
+  }
+
   const handleSendMessage = () => {
     if (messageInput.trim()) {
       playSound.click();
@@ -128,9 +152,12 @@ export const ParentView: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = (status: 'on_way' | 'arrived') => {
+  const handleStatusUpdate = (newStatus: 'on_way' | 'arrived' | 'completed') => {
     playSound.click();
-    updatePickupStatus(currentUser.studentId, status);
+    if (newStatus === 'completed') {
+        playSound.success();
+    }
+    updatePickupStatus(currentUser.studentId, newStatus);
   };
 
   return (
@@ -247,39 +274,63 @@ export const ParentView: React.FC = () => {
 
         {/* Pickup Actions */}
         <h3 className="text-text-light text-sm font-bold uppercase tracking-wider opacity-70 mb-3 px-1">Status Controls</h3>
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={() => handleStatusUpdate('on_way')}
-            disabled={status === 'on_way' || status === 'arrived'}
-            className={`
-              w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
-              ${status === 'on_way' || status === 'arrived' 
-                ? 'bg-warning text-primary opacity-100 shadow-[0_0_20px_rgba(245,158,11,0.3)] ring-2 ring-warning' 
-                : 'bg-surface-dark hover:bg-surface-dark/80 text-text-muted border border-white/5'
-              }
-            `}
-          >
-            <span className="mr-3 material-symbols-outlined text-2xl">local_taxi</span>
-            {status === 'on_way' ? "Status: On My Way" : "I'm leaving now"}
-          </button>
+        
+        {status === 'released' ? (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl mb-4">
+                     <div className="flex gap-3 items-center">
+                         <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                             <span className="material-symbols-outlined text-emerald-400">check</span>
+                         </div>
+                         <div>
+                             <h4 className="font-bold text-emerald-400">Child Released</h4>
+                             <p className="text-xs text-emerald-200/70">Instructor has sent your child out.</p>
+                         </div>
+                     </div>
+                 </div>
+                 <button
+                    onClick={() => handleStatusUpdate('completed')}
+                    className="w-full h-20 flex items-center justify-center rounded-2xl font-bold text-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:scale-[1.02] active:scale-95 transition-all"
+                 >
+                    <span className="mr-3 material-symbols-outlined text-2xl">how_to_reg</span>
+                    Confirm I have my child
+                 </button>
+            </div>
+        ) : (
+            <div className="flex flex-col gap-3">
+            <button
+                onClick={() => handleStatusUpdate('on_way')}
+                disabled={status === 'on_way' || status === 'arrived'}
+                className={`
+                w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
+                ${status === 'on_way' || status === 'arrived' 
+                    ? 'bg-warning text-primary opacity-100 shadow-[0_0_20px_rgba(245,158,11,0.3)] ring-2 ring-warning' 
+                    : 'bg-surface-dark hover:bg-surface-dark/80 text-text-muted border border-white/5'
+                }
+                `}
+            >
+                <span className="mr-3 material-symbols-outlined text-2xl">local_taxi</span>
+                {status === 'on_way' ? "Status: On My Way" : "I'm leaving now"}
+            </button>
 
-          <button
-            onClick={() => handleStatusUpdate('arrived')}
-            disabled={status === 'arrived'}
-            className={`
-              w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
-              ${status === 'arrived'
-                ? 'bg-accent text-primary shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-accent'
-                : status === 'on_way' 
-                  ? 'bg-surface-dark text-text-light border-2 border-accent hover:bg-accent hover:text-primary shadow-lg'
-                  : 'bg-surface-dark text-text-muted opacity-50 cursor-not-allowed border border-white/5'
-              }
-            `}
-          >
-            <span className="mr-3 material-symbols-outlined text-2xl">location_on</span>
-            {status === 'arrived' ? "Status: Arrived" : "I'm here / Outside"}
-          </button>
-        </div>
+            <button
+                onClick={() => handleStatusUpdate('arrived')}
+                disabled={status === 'arrived'}
+                className={`
+                w-full h-16 flex items-center justify-center rounded-2xl font-bold transition-all duration-300 active:scale-95
+                ${status === 'arrived'
+                    ? 'bg-accent text-primary shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-accent'
+                    : status === 'on_way' 
+                    ? 'bg-surface-dark text-text-light border-2 border-accent hover:bg-accent hover:text-primary shadow-lg'
+                    : 'bg-surface-dark text-text-muted opacity-50 cursor-not-allowed border border-white/5'
+                }
+                `}
+            >
+                <span className="mr-3 material-symbols-outlined text-2xl">location_on</span>
+                {status === 'arrived' ? "Status: Arrived" : "I'm here / Outside"}
+            </button>
+            </div>
+        )}
       </div>
     </div>
   );

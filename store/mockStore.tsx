@@ -131,7 +131,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const p = await supabase.from('parents').select('*');
     if (p.data) setParents(p.data);
 
-    const pk = await supabase.from('pickups').select('*');
+    // CRITICAL CHANGE: FILTER BY TODAY ONLY
+    // Prevents stale "Arrived" statuses from showing up the next day
+    const startOfDay = new Date();
+    startOfDay.setHours(0,0,0,0);
+    const todayMs = startOfDay.getTime();
+
+    const pk = await supabase.from('pickups')
+        .select('*')
+        .gte('timestamp', todayMs); // Only get pickups from today
+    
     if (pk.data) setPickupQueue(pk.data);
 
     const sess = await supabase.from('sessions').select('*');
@@ -141,8 +150,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // --- STALE SESSION CHECK ---
-  // If we have an activeStudentId in local storage, but that student does not exist in the fetched data,
-  // we must logout to prevent the "Ghost Account" issue (e.g. seeing Mia when Mia doesn't exist).
   useEffect(() => {
       if (students.length > 0 && activeStudentId) {
           const exists = students.find(s => s.id === activeStudentId);
@@ -181,8 +188,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              if(payload.eventType === 'UPDATE') setParents(prev => prev.map(p => p.id === payload.new.id ? (payload.new as Parent) : p));
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pickups' }, (payload) => {
-            if (payload.eventType === 'INSERT') setPickupQueue(prev => [...prev, payload.new as PickupRequest]);
-            else if (payload.eventType === 'UPDATE') setPickupQueue(prev => prev.map(item => item.id === payload.new.id ? (payload.new as PickupRequest) : item));
+            // We also need to filter realtime events to ensure we don't get old stuff if something weird happens,
+            // but generally valid for today.
+            const newItem = payload.new as PickupRequest;
+            
+            if (payload.eventType === 'INSERT') {
+                // Check if it's from today (simple check)
+                const startOfDay = new Date();
+                startOfDay.setHours(0,0,0,0);
+                if (newItem.timestamp >= startOfDay.getTime()) {
+                    setPickupQueue(prev => [...prev, newItem]);
+                }
+            }
+            else if (payload.eventType === 'UPDATE') setPickupQueue(prev => prev.map(item => item.id === newItem.id ? newItem : item));
             else if (payload.eventType === 'DELETE') setPickupQueue(prev => prev.filter(item => item.id !== payload.old.id));
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, (payload) => {

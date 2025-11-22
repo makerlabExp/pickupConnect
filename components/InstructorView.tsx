@@ -8,7 +8,7 @@ import { PickupRequest } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 export const InstructorView: React.FC = () => {
-  const { pickupQueue, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute } = useAppStore();
+  const { pickupQueue, students, parents, markAsAnnounced, setAudioAnnouncement, isMuted, toggleMute, updatePickupStatus } = useAppStore();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [filterClassroom, setFilterClassroom] = useState<string>('ALL');
   const navigate = useNavigate();
@@ -17,18 +17,23 @@ export const InstructorView: React.FC = () => {
 
   // Filter logic
   const activeRequests = pickupQueue
-    .filter(r => r.status !== 'scheduled' && r.status !== 'dismissed')
+    .filter(r => r.status !== 'scheduled' && r.status !== 'completed') // Hide scheduled and completed
     .filter(r => {
         if (filterClassroom === 'ALL') return true;
         const student = students.find(s => s.id === r.studentId);
         return student?.classroom === filterClassroom;
     })
-    .sort((a, b) => b.timestamp - a.timestamp);
+    .sort((a, b) => {
+        // Sort Released to bottom, then by time
+        if (a.status === 'released' && b.status !== 'released') return 1;
+        if (a.status !== 'released' && b.status === 'released') return -1;
+        return b.timestamp - a.timestamp;
+    });
 
   
   const playAndCacheAudio = async (req: PickupRequest) => {
       try {
-        // Allow audioBase64 to be null if generation fails, consistent with generateAudioAnnouncement return type
+        // Allow audioBase64 to be null if generation fails
         let audioBase64: string | null | undefined = req.audioBase64;
 
         // If no audio cached, generate it
@@ -44,12 +49,12 @@ export const InstructorView: React.FC = () => {
             }
         }
 
-        // If we have audio (either cached or just generated), play it
+        // If we have audio, play it
         if (audioBase64 && !isMuted) {
             await playGeminiAudio(audioBase64);
         }
         
-        // Mark as announced regardless of mute state to prevent loops
+        // Mark as announced
         markAsAnnounced(req.id);
 
       } catch (err) {
@@ -93,6 +98,11 @@ export const InstructorView: React.FC = () => {
     } finally { 
         setProcessingId(null); 
     }
+  };
+
+  const handleReleaseStudent = async (req: PickupRequest) => {
+      playSound.click();
+      updatePickupStatus(req.studentId, 'released');
   };
 
   const tabs = [
@@ -157,10 +167,11 @@ export const InstructorView: React.FC = () => {
                     if(!student || !parent) return null;
 
                     const isArrived = req.status === 'arrived';
+                    const isReleased = req.status === 'released';
                     const isAnnouncing = processingId === req.id;
 
                     return (
-                        <div key={req.id} className={`relative overflow-hidden rounded-2xl p-5 transition-all duration-500 ${isArrived ? 'bg-surface-dark ring-2 ring-accent shadow-[0_0_30px_rgba(16,185,129,0.15)]' : 'bg-surface-dark ring-1 ring-white/10'}`}>
+                        <div key={req.id} className={`relative overflow-hidden rounded-2xl p-5 transition-all duration-500 ${isArrived ? 'bg-surface-dark ring-2 ring-accent shadow-[0_0_30px_rgba(16,185,129,0.15)]' : isReleased ? 'bg-blue-900/20 ring-1 ring-blue-500/30' : 'bg-surface-dark ring-1 ring-white/10'}`}>
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <img src={student.avatarUrl} alt={student.name} className="w-12 h-12 rounded-full bg-slate-700 object-cover ring-2 ring-white/10"/>
@@ -171,8 +182,8 @@ export const InstructorView: React.FC = () => {
                                         </span>
                                     </div>
                                 </div>
-                                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${isArrived ? 'bg-accent text-primary' : 'bg-warning text-primary'}`}>
-                                    {isArrived ? 'Arrived' : 'On Way'}
+                                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${isArrived ? 'bg-accent text-primary' : isReleased ? 'bg-blue-500 text-white' : 'bg-warning text-primary'}`}>
+                                    {isArrived ? 'Arrived' : isReleased ? 'Released' : 'On Way'}
                                 </div>
                             </div>
 
@@ -192,20 +203,38 @@ export const InstructorView: React.FC = () => {
                                 </div>
                             )}
 
+                            {isReleased && (
+                                <div className="bg-blue-500/10 rounded-xl p-3 mb-4 border border-blue-500/20">
+                                     <p className="text-xs text-blue-200 text-center">Student has been released.</p>
+                                     <p className="text-xs text-blue-200/50 text-center mt-1">Waiting for parent confirmation...</p>
+                                </div>
+                            )}
+
                             <div className="flex gap-2">
                                 {isArrived && (
-                                    <button 
-                                        onClick={() => handleManualAnnounce(req)}
-                                        disabled={isAnnouncing}
-                                        className={`flex-1 h-10 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${isAnnouncing ? 'bg-white/5 text-white/50' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                                    >
-                                        <span className="material-symbols-outlined text-lg">{isAnnouncing ? 'progress_activity' : 'campaign'}</span>
-                                        {req.audioBase64 ? 'Replay' : 'Call'}
+                                    <>
+                                        <button 
+                                            onClick={() => handleManualAnnounce(req)}
+                                            disabled={isAnnouncing}
+                                            className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${isAnnouncing ? 'bg-white/5 text-white/50' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                                            title="Replay Announcement"
+                                        >
+                                            <span className="material-symbols-outlined">{isAnnouncing ? 'progress_activity' : 'volume_up'}</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => handleReleaseStudent(req)}
+                                            className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-accent text-primary hover:bg-accent/90 shadow-lg"
+                                        >
+                                            Release Student
+                                            <span className="material-symbols-outlined">logout</span>
+                                        </button>
+                                    </>
+                                )}
+                                {!isArrived && !isReleased && (
+                                    <button className="w-full h-10 rounded-lg border border-white/10 flex items-center justify-center text-text-muted hover:text-white hover:bg-white/5">
+                                        <span className="material-symbols-outlined">check</span>
                                     </button>
                                 )}
-                                <button className="h-10 w-10 rounded-lg border border-white/10 flex items-center justify-center text-text-muted hover:text-white hover:bg-white/5">
-                                    <span className="material-symbols-outlined">check</span>
-                                </button>
                             </div>
                         </div>
                     );
