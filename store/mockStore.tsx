@@ -4,7 +4,7 @@ import { getSupabase, getStoredCredentials } from '../services/firebase';
 import { PickupRequest, PickupStatus, Student, Parent, Session, ChatMessage } from '../types';
 import { setSystemMute } from '../services/soundService';
 
-// --- MOCK DATA (Only used when explicitly seeded by Admin) ---
+// --- MOCK DATA (Used for Demo Mode) ---
 const MOCK_STUDENTS: Student[] = [
   { id: 's1', name: 'Leo', accessCode: '1234', parentId: 'p1', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo', classroom: 'Salle 1' },
   { id: 's2', name: 'Mia', accessCode: '5678', parentId: 'p2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia', classroom: 'Salle DIY' },
@@ -19,7 +19,7 @@ const DEFAULT_SESSION: Session = {
     title: 'General Workshop',
     description: 'Daily Activities',
     endTime: Date.now() + 1000 * 60 * 60, 
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD2x5mdNdc8OqJ4jljwmWPVlljklCxxmQ0HASTp4Qp1dc1k4CWXD5nEuUUyWrkA30BihR-Xd2ENLlHElkNLOJTOd4_o3tjxojevwq4u4kzNDCTv61_7mEBiKnn5vcfHJhLgEufZar06IQy2WFEq-wTbtMqlSmOuaWwnU26DYXa6YD-TLr_vlzX2DMvQOOPG9S_YWryPA--CwWEdfQVHuh_sPEOvVftpzjILH41CDIcuftt8SHCSvBgw_GQHOxq7EAdrSe6n8LwYCnDM',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=2070&auto=format&fit=crop',
     isActive: true
 };
 
@@ -86,7 +86,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [isMuted, setIsMuted] = useState(false);
 
-  // PRODUCTION CHANGE: Initialize with empty arrays. No mock data by default.
+  // Initialize with empty, but if NOT configured, we will auto-seed in useEffect
   const [students, setStudents] = useState<Student[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -119,27 +119,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- DATA FETCHING ---
   const refreshData = useCallback(async () => {
     const supabase = getSupabase();
+    
+    // DEMO MODE: If not configured, ensure we have mock data so PWA works out of the box
     if (!supabase) {
-        // If no DB, we do NOT load mock data automatically anymore.
-        // We want a clean state for production.
+        setStudents(prev => prev.length === 0 ? MOCK_STUDENTS : prev);
+        setParents(prev => prev.length === 0 ? MOCK_PARENTS : prev);
+        setSessions(prev => prev.length === 0 ? [DEFAULT_SESSION] : prev);
         return;
     }
 
+    // PRODUCTION MODE: Fetch from Supabase
     const s = await supabase.from('students').select('*');
     if (s.data) setStudents(s.data); 
 
     const p = await supabase.from('parents').select('*');
     if (p.data) setParents(p.data);
 
-    // CRITICAL CHANGE: FILTER BY TODAY ONLY
-    // Prevents stale "Arrived" statuses from showing up the next day
+    // Filter by today
     const startOfDay = new Date();
     startOfDay.setHours(0,0,0,0);
     const todayMs = startOfDay.getTime();
 
     const pk = await supabase.from('pickups')
         .select('*')
-        .gte('timestamp', todayMs); // Only get pickups from today
+        .gte('timestamp', todayMs); 
     
     if (pk.data) setPickupQueue(pk.data);
 
@@ -148,9 +151,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   }, []);
 
+  // Ensure data is loaded (either Mock or Real) on mount
+  useEffect(() => {
+      refreshData();
+  }, [refreshData, isConfigured]);
 
   // --- STALE SESSION CHECK ---
   useEffect(() => {
+      // Only check if we actually have data loaded
       if (students.length > 0 && activeStudentId) {
           const exists = students.find(s => s.id === activeStudentId);
           if (!exists) {
@@ -172,7 +180,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- SUPABASE REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
-    refreshData();
     const supabase = getSupabase();
     if (!supabase) return;
 
@@ -188,12 +195,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              if(payload.eventType === 'UPDATE') setParents(prev => prev.map(p => p.id === payload.new.id ? (payload.new as Parent) : p));
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pickups' }, (payload) => {
-            // We also need to filter realtime events to ensure we don't get old stuff if something weird happens,
-            // but generally valid for today.
             const newItem = payload.new as PickupRequest;
-            
             if (payload.eventType === 'INSERT') {
-                // Check if it's from today (simple check)
                 const startOfDay = new Date();
                 startOfDay.setHours(0,0,0,0);
                 if (newItem.timestamp >= startOfDay.getTime()) {
@@ -351,7 +354,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [pickupQueue, students]);
 
   const setAnnouncement = useCallback(async (reqId: string, text: string) => {
-      // Optimistic
       setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, aiAnnouncement: text } : p));
 
       const supabase = getSupabase();
@@ -359,7 +361,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const setAudioAnnouncement = useCallback(async (reqId: string, audioBase64: string) => {
-      // Optimistic
       setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, audioBase64 } : p));
       
       const supabase = getSupabase();
@@ -367,7 +368,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const markAsAnnounced = useCallback(async (reqId: string) => {
-      // Optimistic
       setPickupQueue(prev => prev.map(p => p.id === reqId ? { ...p, hasAnnounced: true } : p));
 
       const supabase = getSupabase();
@@ -395,7 +395,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${parentName + code}`
         };
 
-        // Optimistic Update
         setStudents(prev => [...prev, newStudent]);
         setParents(prev => [...prev, newParent]);
 
@@ -403,11 +402,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (supabase) {
             const { error: e1 } = await supabase.from('students').insert(newStudent);
             const { error: e2 } = await supabase.from('parents').insert(newParent);
-            if (e1 || e2) {
-                console.error("Failed to sync add family", e1, e2);
-            }
+            if (e1 || e2) console.error("Failed to sync add family", e1, e2);
         }
-        alert(`Added ${studentName} to ${classroom}! Access Code: ${code}`);
+        alert(`Added ${studentName}! Code: ${code}`);
   }, []);
 
   const addSession = useCallback(async (title: string, description: string, imageUrl: string) => {
@@ -417,7 +414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description,
           imageUrl,
           isActive: false,
-          endTime: Date.now() + (1000 * 60 * 60 * 2) // 2 hours default
+          endTime: Date.now() + (1000 * 60 * 60 * 2) 
       };
 
       setSessions(prev => [...prev, newSession]);
@@ -429,7 +426,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const activateSession = useCallback(async (sessionId: string) => {
-      // Optimistic
       setSessions(prev => prev.map(s => ({ ...s, isActive: s.id === sessionId })));
 
       const supabase = getSupabase();
@@ -440,7 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const seedDatabase = useCallback(async () => {
-      // Explicit Seed Action
+      // Local State Update (Works immediately even if offline/demo)
       setStudents(MOCK_STUDENTS);
       setParents(MOCK_PARENTS);
       setSessions([DEFAULT_SESSION]);
@@ -455,13 +451,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!data || data.length === 0) {
                 await supabase.from('sessions').insert(DEFAULT_SESSION);
             }
-            await refreshData();
           } catch (e) {
               console.error("Seeding failed", e);
           }
       }
       alert("Test data seeded.");
-  }, [refreshData]);
+  }, []);
 
   const resetSystem = useCallback(async () => {
       const supabase = getSupabase();
@@ -471,7 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await supabase.from('students').delete().neq('id', '0');
           await supabase.from('sessions').delete().neq('id', '0');
       }
-      // Reset local storage and state
+      
       setStudents([]);
       setParents([]);
       setSessions([]);

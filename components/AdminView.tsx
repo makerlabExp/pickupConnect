@@ -4,6 +4,7 @@ import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
 import { useNavigate } from 'react-router-dom';
 import { getStoredCredentials } from '../services/firebase';
+import { Student } from '../types';
 
 export const AdminView: React.FC = () => {
   const { students, parents, sessions, addStudent, addSession, activateSession, resetSystem, seedDatabase, logout, isConfigured } = useAppStore();
@@ -20,6 +21,9 @@ export const AdminView: React.FC = () => {
   const [sessionTitle, setSessionTitle] = useState('');
   const [sessionDesc, setSessionDesc] = useState('');
   
+  // QR Modal State
+  const [selectedPass, setSelectedPass] = useState<Student | null>(null);
+
   // Auto-switch to settings if not configured
   useEffect(() => {
       if (!isConfigured) {
@@ -69,11 +73,6 @@ export const AdminView: React.FC = () => {
       const payload = btoa(configData);
       
       const origin = window.location.origin;
-      // For HashRouter, we construct the URL carefully:
-      // https://domain.com/#/setup?config=...&redirect=/parent
-      // The hash comes before the path in React Router 7/6 HashRouter, but queries can be tricky.
-      // Standard format: https://domain.com/#/setup?config=...
-      
       const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
       let link = `${origin}${pathname}/#/setup?config=${payload}`;
       
@@ -85,6 +84,14 @@ export const AdminView: React.FC = () => {
       
       const roleName = redirectPath ? redirectPath.replace('/', '').toUpperCase() : 'Main App';
       alert(`Magic Link for ${roleName} copied!\n\nShare this with users. It will auto-configure the app and open the correct screen.`);
+  };
+
+  // Generate QR Link
+  const getQrLink = (code: string) => {
+      const origin = window.location.origin;
+      const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
+      // Constructs: https://domain.com/#/parent?autoLogin=1234
+      return `${origin}${pathname}/#/parent?autoLogin=${code}`;
   };
 
   return (
@@ -391,7 +398,7 @@ export const AdminView: React.FC = () => {
                         {students.map(student => {
                             const parent = parents.find(p => p.id === student.parentId);
                             return (
-                                <div key={student.id} className="bg-slate-800 p-4 rounded-xl border border-white/5 flex items-center gap-4">
+                                <div key={student.id} className="bg-slate-800 p-4 rounded-xl border border-white/5 flex items-center gap-4 relative group">
                                     <img src={student.avatarUrl} alt={student.name} className="w-14 h-14 rounded-full bg-slate-700 object-cover"/>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
@@ -407,6 +414,15 @@ export const AdminView: React.FC = () => {
                                             <span className="text-xs text-slate-500">• Parent: {parent?.name}</span>
                                         </div>
                                     </div>
+                                    
+                                    {/* Action Button for QR Pass */}
+                                    <button 
+                                        onClick={() => setSelectedPass(student)}
+                                        className="absolute right-2 top-2 p-2 bg-blue-600 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-blue-500"
+                                        title="Show Digital Pass"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">qr_code_2</span>
+                                    </button>
                                 </div>
                             );
                         })}
@@ -463,6 +479,47 @@ export const AdminView: React.FC = () => {
             )}
         </div>
       </div>
+
+      {/* QR PASS MODAL */}
+      {selectedPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl animate-in zoom-in-50 duration-300">
+                <button 
+                    onClick={() => setSelectedPass(null)}
+                    className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200"
+                >
+                    <span className="material-symbols-outlined">close</span>
+                </button>
+
+                <div className="flex flex-col items-center text-center">
+                    <div className="mb-6">
+                        <img src={selectedPass.avatarUrl} className="w-20 h-20 rounded-full border-4 border-slate-100 bg-slate-50" />
+                    </div>
+                    
+                    <h2 className="text-2xl font-bold text-slate-900 leading-none">{selectedPass.name}</h2>
+                    <p className="text-slate-500 text-sm mt-1 mb-6 font-medium uppercase tracking-wider">{selectedPass.classroom}</p>
+                    
+                    <div className="bg-slate-900 p-4 rounded-2xl shadow-inner mb-6">
+                         <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getQrLink(selectedPass.accessCode))}&bgcolor=0f172a&color=ffffff&margin=10`}
+                            alt="Scan to Connect"
+                            className="w-48 h-48 rounded-lg"
+                         />
+                    </div>
+                    
+                    <div className="bg-slate-50 rounded-xl p-4 w-full border border-slate-200">
+                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Backup Access Code</p>
+                        <p className="text-3xl font-mono font-bold text-slate-800 tracking-[0.2em]">{selectedPass.accessCode}</p>
+                    </div>
+
+                    <p className="mt-6 text-xs text-slate-400">
+                        Scan with camera to auto-connect.
+                    </p>
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };

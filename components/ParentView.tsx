@@ -1,13 +1,17 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/mockStore';
 import { playSound } from '../services/soundService';
+import { useSearchParams } from 'react-router-dom';
 
 export const ParentView: React.FC = () => {
   const { currentSession, parents, pickupQueue, updatePickupStatus, sendMessage, activeParentId, loginParent, logout } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // --- Login State ---
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
+  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false);
   
   // --- Tab State (Home, Chat, Profile) ---
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
@@ -18,6 +22,26 @@ export const ParentView: React.FC = () => {
 
   // --- Timer State ---
   const [timeLeft, setTimeLeft] = useState<{h: number, m: number, s: number}>({ h: 0, m: 0, s: 0 });
+
+  // --- Auto Login Logic ---
+  useEffect(() => {
+    const autoCode = searchParams.get('autoLogin');
+    if (autoCode && !activeParentId) {
+        setIsAutoLoggingIn(true);
+        // Small delay to ensure data is loaded
+        setTimeout(() => {
+            const success = loginParent(autoCode);
+            if (success) {
+                playSound.success();
+                // Clear the param from URL to keep it clean, but don't refresh
+                setSearchParams({}, { replace: true });
+            } else {
+                setError(true);
+            }
+            setIsAutoLoggingIn(false);
+        }, 800);
+    }
+  }, [searchParams, loginParent, activeParentId]);
 
   // --- Timer Logic ---
   useEffect(() => {
@@ -88,6 +112,17 @@ export const ParentView: React.FC = () => {
 
   // --- UNLOGGED VIEW ---
   if (!currentUser) {
+      if (isAutoLoggingIn) {
+          return (
+              <div className="flex h-[100dvh] w-full items-center justify-center bg-primary text-white font-display">
+                  <div className="flex flex-col items-center gap-4">
+                      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-sm font-bold animate-pulse">Verifying Pass...</p>
+                  </div>
+              </div>
+          );
+      }
+
       return (
           <div className="flex h-[100dvh] w-full flex-col bg-primary text-text-light font-display overflow-hidden">
                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
@@ -318,6 +353,13 @@ export const ParentView: React.FC = () => {
                             <p className="text-xs text-text-muted">Parent Account</p>
                         </div>
                     </div>
+                    
+                    <div className="p-4 bg-blue-900/20 border-b border-white/5">
+                        <p className="text-[10px] uppercase font-bold text-blue-400 mb-1">Backup Login Code</p>
+                        <p className="text-xl font-mono font-bold text-white tracking-widest">{code || "••••"}</p>
+                        <p className="text-[10px] text-slate-400 mt-2">Use this code if you get logged out after installing the app.</p>
+                    </div>
+
                     <button onClick={() => logout()} className="w-full p-4 text-left text-red-400 hover:bg-white/5 transition-colors flex items-center gap-3">
                         <span className="material-symbols-outlined">logout</span>
                         Logout
